@@ -93,3 +93,33 @@ func WithSchemaReference(ref oas.Reference) Option {
 		}
 	})
 }
+
+func WithComplexSerialization(keyAndValues ...interface{}) Option {
+	if len(keyAndValues)%2 != 0 {
+		panic("keyAndValues must have an even number")
+	}
+	return optionFunc(func(parameter *oas.Parameter) {
+		for i := 0; i < len(keyAndValues)/2; i++ {
+			key := keyAndValues[i*2].(string)
+			value := keyAndValues[i*2+1]
+			switch v := value.(type) {
+			case oas.Schema:
+				parameter.Content[key] = oas.MediaType{
+					Schema: oas.ValueOrReferenceOf[oas.Schema]{
+						Value: v,
+					},
+					Example:  nil,
+					Examples: nil,
+				}
+			case oas.Reference:
+				parameter.Content[key] = oas.MediaType{
+					Schema: oas.ValueOrReferenceOf[oas.Schema]{
+						Ref: oas.Reference{},
+					},
+					Example:  nil,
+					Examples: nil,
+				}
+			}
+		}
+	})
+}
