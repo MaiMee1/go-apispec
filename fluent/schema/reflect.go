@@ -87,7 +87,7 @@ func parseType(t reflect.Type) oas.Type {
 }
 
 func buildProperty(t reflect.Type) (properties map[string]oas.ValueOrReferenceOf[oas.Schema], required []string) {
-	fmt.Println("buildProperty", t)
+	//fmt.Println("buildProperty", t)
 	properties = make(map[string]oas.ValueOrReferenceOf[oas.Schema])
 	required = make([]string, 0)
 	for i := 0; i < t.NumField(); i++ {
@@ -154,7 +154,7 @@ func buildProperty(t reflect.Type) (properties map[string]oas.ValueOrReferenceOf
 var cache = make(map[string]*oas.Schema)
 
 func defineObject(t reflect.Type, nullable bool) (string, oas.Schema) {
-	fmt.Println("defineObject", t, nullable)
+	//fmt.Println("defineObject", t, nullable)
 	kind := t.Kind()
 	if kind == reflect.Ptr {
 		// unwrap pointer
@@ -164,7 +164,7 @@ func defineObject(t reflect.Type, nullable bool) (string, oas.Schema) {
 	name := makeName(t)
 	// TODO: cache better
 	if c, ok := cache[name]; ok {
-		fmt.Println("cache hit", name)
+		//fmt.Println("cache hit", name)
 		return name, *c
 	}
 
