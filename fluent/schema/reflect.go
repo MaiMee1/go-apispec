@@ -23,7 +23,11 @@ func makeRef(name string) string {
 func makeName(t reflect.Type) string {
 	name := t.Name()
 	if name == "" {
-		name = "ptr" + makeName(t.Elem())
+		if t.Kind() == reflect.Interface {
+			name = "any"
+		} else {
+			name = "ptr" + makeName(t.Elem())
+		}
 	}
 	pkgPath := t.PkgPath()
 	if pkgPath != "." {
@@ -79,7 +83,7 @@ func parseType(t reflect.Type) oas.Type {
 		return oas.StringType
 	case reflect.Array, reflect.Slice:
 		return oas.ArrayType
-	case reflect.Struct, reflect.Map:
+	case reflect.Struct, reflect.Map, reflect.Interface:
 		return oas.ObjectType
 	default:
 		return 0
@@ -184,10 +188,13 @@ func defineObject(t reflect.Type, nullable bool) (string, oas.Schema) {
 		p.Required = required
 		p.Properties = properties
 		name = makeName(t)
+	case reflect.Interface:
+		p.AdditionalProperties = &oas.Or[bool, *oas.ValueOrReferenceOf[oas.Schema]]{
+			X: true,
+		}
 	case reflect.Map:
 		_, item := defineObject(t.Elem(), nullable)
 		p.AdditionalProperties = &oas.Or[bool, *oas.ValueOrReferenceOf[oas.Schema]]{
-			//X: true,
 			Y: &oas.ValueOrReferenceOf[oas.Schema]{
 				Value: item,
 			},
