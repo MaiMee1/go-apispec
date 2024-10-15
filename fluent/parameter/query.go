@@ -5,7 +5,7 @@ import "github.com/MaiMee1/go-apispec/oas/v3"
 func Query(name string, description oas.RichText, required bool, opts ...Option) oas.Parameter {
 	param := &oas.Parameter{
 		In:          oas.QueryLocation,
-		Style:       oas.FormStyle,
+		Style:       0, // oas.FormStyle
 		Name:        name,
 		Description: description,
 		Required:    required,

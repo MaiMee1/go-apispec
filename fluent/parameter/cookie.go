@@ -5,7 +5,7 @@ import "github.com/MaiMee1/go-apispec/oas/v3"
 func Cookie(name string, description oas.RichText, required bool, opts ...Option) oas.Parameter {
 	param := &oas.Parameter{
 		In:          oas.CookieLocation,
-		Style:       oas.FormStyle,
+		Style:       0, // oas.FormStyle
 		Name:        name,
 		Description: description,
 		Required:    required,

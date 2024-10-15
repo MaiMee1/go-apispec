@@ -5,7 +5,7 @@ import "github.com/MaiMee1/go-apispec/oas/v3"
 func Header(name string, description oas.RichText, required bool, opts ...Option) oas.Parameter {
 	param := &oas.Parameter{
 		In:          oas.HeaderLocation,
-		Style:       oas.SimpleStyle,
+		Style:       0, // oas.SimpleStyle
 		Name:        name,
 		Description: description,
 		Required:    required,
