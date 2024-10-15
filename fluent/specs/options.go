@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/MaiMee1/go-apispec/fluent/operation"
+	"github.com/MaiMee1/go-apispec/fluent/server"
 	"github.com/MaiMee1/go-apispec/oas/v3"
 )
 
@@ -62,9 +63,13 @@ func WithLicense(name string, url string) Option {
 	})
 }
 
-func WithServer(server oas.Server) Option {
+func WithServer(protocol, hostname string, port uint16, pathname string) Option {
+	srv, err := server.New(protocol, hostname, port, pathname)
+	if err != nil {
+		panic(err)
+	}
 	return optionFunc(func(api *API) {
-		api.document.Servers = append(api.document.Servers, server)
+		api.document.Servers = append(api.document.Servers, *srv)
 	})
 }
 
