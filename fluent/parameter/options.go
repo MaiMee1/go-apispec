@@ -3,6 +3,7 @@ package parameter
 import (
 	"strconv"
 
+	"github.com/MaiMee1/go-apispec/fluent/schema"
 	"github.com/MaiMee1/go-apispec/oas/v3"
 )
 
@@ -66,6 +67,14 @@ func WithSerialization(style oas.Style, explode bool) Option {
 	return optionFunc(func(parameter *oas.Parameter) {
 		parameter.Style = style
 		parameter.Explode = &explode
+	})
+}
+
+func WithSchemaFor[T any](opts ...schema.Option) Option {
+	return optionFunc(func(parameter *oas.Parameter) {
+		parameter.Schema = &oas.ValueOrReferenceOf[oas.Schema]{
+			Value: schema.For[T](opts...),
+		}
 	})
 }
 
