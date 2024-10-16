@@ -43,3 +43,9 @@ func WithDeprecated() Option {
 		schema.Deprecated = true
 	})
 }
+
+func WithEnum(value ...interface{}) Option {
+	return optionFunc(func(schema *oas.Schema) {
+		schema.Enum = value
+	})
+}

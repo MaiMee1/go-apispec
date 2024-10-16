@@ -63,6 +63,12 @@ func WithLicense(name string, url string) Option {
 	})
 }
 
+func WithVersion(version string) Option {
+	return optionFunc(func(api *API) {
+		api.document.Info.Version = version
+	})
+}
+
 func WithServer(protocol, hostname string, port uint16, pathname string, opts ...server.Option) Option {
 	srv, err := server.New(protocol, hostname, port, pathname, opts...)
 	if err != nil {
