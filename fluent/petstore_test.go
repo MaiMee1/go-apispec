@@ -9,9 +9,11 @@ import (
 	"github.com/MaiMee1/go-apispec/fluent/schema"
 	"github.com/MaiMee1/go-apispec/fluent/security"
 	"github.com/MaiMee1/go-apispec/fluent/specs"
+	"github.com/MaiMee1/go-apispec/oas/v3"
 )
 
 type Pet struct{}
+type ApiResponse struct{}
 
 func TestFluent_PetStore(t *testing.T) {
 	api, err := specs.New(
@@ -26,6 +28,15 @@ func TestFluent_PetStore(t *testing.T) {
 		specs.WithTag("pet", "Everything about your Pets"),
 		specs.WithTag("store", "Access to Petstore orders"),
 		specs.WithTag("user", "Operations about user"),
+		specs.WithComponents(
+			"petstore_auth", security.NewOAuth2Scheme(
+				security.WithImplicitFlow("https://petstore3.swagger.io/oauth/authorize", "",
+					"write:pets", "modify pets in your account",
+					"read:pets", "read your pets",
+				),
+			),
+			"api_key", security.NewApiKeyScheme("api_key"),
+		),
 		specs.WithOperation("updatePet", http.MethodPut, "/pet",
 			operation.WithSummary("Update an existing pet"),
 			operation.WithDescription("Update an existing pet by Id"),
@@ -42,9 +53,7 @@ func TestFluent_PetStore(t *testing.T) {
 			operation.WithResponse(http.StatusBadRequest, "Invalid ID supplied"),
 			operation.WithResponse(http.StatusNotFound, "Pet not found"),
 			operation.WithResponse(http.StatusUnprocessableEntity, "Validation exception"),
-			operation.WithSecurity(security.All{
-				"petstore_auth": []string{"write:pets", "read:pets"},
-			}),
+			operation.WithSecurity(security.Scheme("petstore_auth", "write:pets", "read:pets")),
 		),
 		specs.WithOperation("addPet", http.MethodPost, "/pet",
 			operation.WithSummary("Add a new pet to the store"),
@@ -61,11 +70,9 @@ func TestFluent_PetStore(t *testing.T) {
 			),
 			operation.WithResponse(http.StatusBadRequest, "Invalid ID supplied"),
 			operation.WithResponse(http.StatusUnprocessableEntity, "Validation exception"),
-			operation.WithSecurity(security.All{
-				"petstore_auth": []string{"write:pets", "read:pets"},
-			}),
+			operation.WithSecurity(security.Scheme("petstore_auth", "write:pets", "read:pets")),
 		),
-		specs.WithOperation("findPetsByStatus", http.MethodPost, "/pet/findByStatus",
+		specs.WithOperation("findPetsByStatus", http.MethodGet, "/pet/findByStatus",
 			operation.WithSummary("Finds Pets by status"),
 			operation.WithDescription("Multiple status values can be provided with comma separated strings"),
 			operation.WithTags("pet"),
@@ -73,7 +80,8 @@ func TestFluent_PetStore(t *testing.T) {
 				parameter.Query("status", "Status values that need to be considered for filter", false, parameter.WithSchemaFor[string](
 					schema.WithDefault("available"),
 					schema.WithEnum("available", "pending", "sold"),
-				), parameter.WithFormStyle(true))),
+				), parameter.WithFormStyle(true)),
+			),
 			operation.WithBody("Create a new pet in the store", true,
 				"application/json", schema.For[Pet](),
 				"application/xml", schema.For[Pet](),
@@ -85,9 +93,80 @@ func TestFluent_PetStore(t *testing.T) {
 			),
 			operation.WithResponse(http.StatusBadRequest, "Invalid ID supplied"),
 			operation.WithResponse(http.StatusUnprocessableEntity, "Validation exception"),
-			operation.WithSecurity(security.All{
-				"petstore_auth": []string{"write:pets", "read:pets"},
-			}),
+			operation.WithSecurity(security.Scheme("petstore_auth", "write:pets", "read:pets")),
+		),
+		specs.WithOperation("findPetsByTags", http.MethodGet, "/pet/findByTags",
+			operation.WithSummary("Finds Pets by tags"),
+			operation.WithDescription("Multiple tags can be provided with comma separated strings. Use tag1, tag2, tag3 for testing."),
+			operation.WithTags("pet"),
+			operation.WithParams(
+				parameter.Query("tags", "Tags to filter by", false, parameter.WithSchemaFor[[]string](
+					schema.WithDefault("available"),
+					schema.WithEnum("available", "pending", "sold"),
+				), parameter.WithFormStyle(true)),
+			),
+			operation.WithResponse(http.StatusOK, "successful operation",
+				"application/json", schema.For[[]Pet](),
+				"application/xml", schema.For[[]Pet](),
+			),
+			operation.WithResponse(http.StatusBadRequest, "Invalid tag value"),
+			operation.WithSecurity(security.Scheme("petstore_auth", "write:pets", "read:pets")),
+		),
+		specs.WithOperation("getPetById", http.MethodGet, "/pet/{pedId}",
+			operation.WithSummary("Find pet by ID"),
+			operation.WithDescription("Returns a single pet"),
+			operation.WithTags("pet"),
+			operation.WithParams(
+				parameter.Path("petId", "ID of pet to return", true, parameter.WithSchemaFor[int64]()),
+			),
+			operation.WithResponse(http.StatusOK, "successful operation",
+				"application/json", schema.For[Pet](),
+				"application/xml", schema.For[Pet](),
+			),
+			operation.WithResponse(http.StatusBadRequest, "Invalid ID supplied"),
+			operation.WithResponse(http.StatusNotFound, "Pet not found"),
+			operation.WithSecurity(security.Scheme("api_key")),
+			operation.WithSecurity(security.Scheme("petstore_auth", "write:pets", "read:pets")),
+		),
+		specs.WithOperation("updatePetWithForm", http.MethodPost, "/pet/{pedId}",
+			operation.WithSummary("Updates a pet in the store with form data"),
+			operation.WithTags("pet"),
+			operation.WithParams(
+				parameter.Path("petId", "ID of pet that needs to be updated", true, parameter.WithSchemaFor[int64]()),
+				parameter.Query("name", "Name of pet that needs to be updated", false, parameter.WithSchemaFor[string]()),
+				parameter.Query("status", "Status of pet that needs to be updated", false, parameter.WithSchemaFor[string]()),
+			),
+			operation.WithResponse(http.StatusBadRequest, "Invalid input"),
+			operation.WithSecurity(security.Scheme("petstore_auth", "write:pets", "read:pets")),
+		),
+		specs.WithOperation("deletePet", http.MethodDelete, "/pet/{pedId}",
+			operation.WithSummary("Deletes a pet"),
+			operation.WithDescription("deletes a pet"),
+			operation.WithTags("pet"),
+			operation.WithParams(
+				parameter.Header("api_key", "", false, parameter.WithSchemaFor[string]()),
+				parameter.Path("petId", "Pet id to delete", true, parameter.WithSchemaFor[int64]()),
+			),
+			operation.WithResponse(http.StatusBadRequest, "Invalid pet value"),
+			operation.WithSecurity(security.Scheme("petstore_auth", "write:pets", "read:pets")),
+		),
+		specs.WithOperation("uploadFile", http.MethodPost, "/pet/{pedId}/uploadImage",
+			operation.WithSummary("uploads an image"),
+			operation.WithTags("pet"),
+			operation.WithParams(
+				parameter.Path("petId", "ID of pet to update", true, parameter.WithSchemaFor[int64]()),
+				parameter.Query("additionalMetadata", "Additional Metadata", false, parameter.WithSchemaFor[string]()),
+			),
+			operation.WithBody("", false, "application/octet-stream", schema.String(oas.BinaryFormat)),
+			operation.WithResponse(http.StatusOK, "successful operation", "application/json", schema.For[ApiResponse]()),
+			operation.WithSecurity(security.Scheme("petstore_auth", "write:pets", "read:pets")),
+		),
+		specs.WithOperation("getInventory", http.MethodPost, "/store/inventory",
+			operation.WithSummary("Returns pet inventories by status"),
+			operation.WithDescription("Returns a map of status codes to quantities"),
+			operation.WithTags("store"),
+			operation.WithResponse(http.StatusOK, "successful operation", "application/json", schema.For[map[string]int32]()),
+			operation.WithSecurity(security.Scheme("api_key")),
 		),
 	)
 	if err != nil {
