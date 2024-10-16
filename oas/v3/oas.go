@@ -309,13 +309,13 @@ func (o Or[A, B]) MarshalJSON() ([]byte, error) {
 }
 
 type ValueOrReferenceOf[T any] struct {
-	Value T
-	Ref   Reference
-	Root  interface{} // a reference to the root document, set via reflection
+	Value     T
+	Reference *Reference
+	Root      interface{} // a reference to the root document, set via reflection
 }
 
-func (r ValueOrReferenceOf[T]) Resolve(v ...interface{}) T {
-	root := r.Root
+func (o ValueOrReferenceOf[T]) Resolve(v ...interface{}) T {
+	root := o.Root
 	if root == nil {
 		if len(v) > 0 {
 			root = v[0]
@@ -325,36 +325,38 @@ func (r ValueOrReferenceOf[T]) Resolve(v ...interface{}) T {
 	}
 
 	var t T
-	if r.Ref.Ref != "" {
-		b, _ := json.Marshal(resolve(r.Ref, root))
+	if o.Reference.Ref != "" {
+		b, _ := json.Marshal(resolve(o.Reference, root))
 		_ = json.Unmarshal(b, &t)
 		setRoot(reflect.ValueOf(t), root)
 		return t
 	}
-	return r.Value
+	return o.Value
 }
 
 //goland:noinspection GoMixedReceiverTypes
-func (r *ValueOrReferenceOf[T]) UnmarshalJSON(b []byte) error {
-	var s Reference
-	if err := json.Unmarshal(b, &s); err != nil {
+func (o *ValueOrReferenceOf[T]) UnmarshalJSON(b []byte) error {
+	var r Reference
+	if err := json.Unmarshal(b, &r); err != nil {
 		return err
 	}
 	var v T
 	if err := json.Unmarshal(b, &v); err != nil {
 		return err
 	}
-	r.Value = v
-	r.Ref = s
+	o.Value = v
+	if r.Ref != "" {
+		o.Reference = &r
+	}
 	return nil
 }
 
 //goland:noinspection GoMixedReceiverTypes
-func (r ValueOrReferenceOf[T]) MarshalJSON() ([]byte, error) {
-	if r.Ref.Ref != "" {
-		return json.Marshal(r.Ref)
+func (o ValueOrReferenceOf[T]) MarshalJSON() ([]byte, error) {
+	if o.Reference != nil {
+		return json.Marshal(o.Reference)
 	}
-	return json.Marshal(r.Value)
+	return json.Marshal(o.Value)
 }
 
 type DataType struct {
@@ -384,12 +386,12 @@ func Default() OpenAPI {
 type OpenAPI struct {
 	Version      SemanticVersion                         `json:"openapi" validate:"required"`
 	Info         Info                                    `json:"info" validate:"required"`
-	Servers      []Server                                `json:"servers,omitempty"`
-	Paths        Paths                                   `json:"paths,omitempty"`
-	Webhooks     map[string]ValueOrReferenceOf[PathItem] `json:"webhooks,omitempty"`
+	Servers      []Server                                `json:"servers,omitempty" validate:"dive"`
+	Paths        Paths                                   `json:"paths,omitempty" validate:"dive"`
+	Webhooks     map[string]ValueOrReferenceOf[PathItem] `json:"webhooks,omitempty" validate:"dive"`
 	Components   Components                              `json:"components"`
-	Security     []SecurityRequirement                   `json:"security,omitempty"`
-	Tags         []Tag                                   `json:"tags,omitempty"`
+	Security     []SecurityRequirement                   `json:"security,omitempty" validate:"dive"`
+	Tags         []Tag                                   `json:"tags,omitempty" validate:"dive"`
 	ExternalDocs *ExternalDocumentation                  `json:"externalDocs,omitempty"`
 	Extensions   SpecificationExtension                  `json:"-"`
 }
@@ -425,7 +427,7 @@ type License struct {
 type Server struct {
 	Url         UrlTemplate               `json:"url" validate:"required"`
 	Description RichText                  `json:"description"`
-	Variables   map[string]ServerVariable `json:"variables,omitempty"`
+	Variables   map[string]ServerVariable `json:"variables,omitempty" validate:"dive"`
 	Extensions  SpecificationExtension    `json:"-"`
 }
 
@@ -437,16 +439,16 @@ type ServerVariable struct {
 }
 
 type Components struct {
-	Schemas         map[string]Schema         `json:"schemas,omitempty"`
-	Responses       map[string]Response       `json:"responses,omitempty"`
-	Parameters      map[string]Parameter      `json:"parameters,omitempty"`
-	Examples        map[string]Example        `json:"examples,omitempty"`
-	RequestBodies   map[string]RequestBody    `json:"requestBodies,omitempty"`
-	Headers         map[string]Header         `json:"headers,omitempty"`
-	SecuritySchemes map[string]SecurityScheme `json:"securitySchemes,omitempty"`
-	Links           map[string]Link           `json:"links,omitempty"`
-	Callbacks       map[string]Callback       `json:"callbacks,omitempty"`
-	PathItems       map[string]PathItem       `json:"pathItems,omitempty"`
+	Schemas         map[string]Schema         `json:"schemas,omitempty" validate:"dive"`
+	Responses       map[string]Response       `json:"responses,omitempty" validate:"dive"`
+	Parameters      map[string]Parameter      `json:"parameters,omitempty" validate:"dive"`
+	Examples        map[string]Example        `json:"examples,omitempty" validate:"dive"`
+	RequestBodies   map[string]RequestBody    `json:"requestBodies,omitempty" validate:"dive"`
+	Headers         map[string]Header         `json:"headers,omitempty" validate:"dive"`
+	SecuritySchemes map[string]SecurityScheme `json:"securitySchemes,omitempty" validate:"dive"`
+	Links           map[string]Link           `json:"links,omitempty" validate:"dive"`
+	Callbacks       map[string]Callback       `json:"callbacks,omitempty" validate:"dive"`
+	PathItems       map[string]PathItem       `json:"pathItems,omitempty" validate:"dive"`
 	Extensions      SpecificationExtension    `json:"-"`
 }
 
@@ -459,7 +461,7 @@ func isValidComponentsKey(key string) bool {
 type Paths map[string]PathItem
 
 type PathItem struct {
-	Ref         string                          `json:"$ref,omitempty" validate:"uri"`
+	Ref         string                          `json:"$ref,omitempty" validate:"omitempty,uri"`
 	Summary     string                          `json:"summary,omitempty"`
 	Description RichText                        `json:"description,omitempty"`
 	Get         *Operation                      `json:"get,omitempty"`
@@ -510,13 +512,13 @@ type Operation struct {
 	Description  RichText                                `json:"description"`
 	ExternalDocs *ExternalDocumentation                  `json:"externalDocs,omitempty"`
 	OperationId  string                                  `json:"operationId,omitempty"`
-	Parameters   []ValueOrReferenceOf[Parameter]         `json:"parameters,omitempty"`
+	Parameters   []ValueOrReferenceOf[Parameter]         `json:"parameters,omitempty" validate:"dive"`
 	RequestBody  *ValueOrReferenceOf[RequestBody]        `json:"requestBody,omitempty"`
-	Responses    Responses                               `json:"responses,omitempty"`
-	Callbacks    map[string]ValueOrReferenceOf[Callback] `json:"callbacks,omitempty"`
+	Responses    Responses                               `json:"responses,omitempty" validate:"dive"`
+	Callbacks    map[string]ValueOrReferenceOf[Callback] `json:"callbacks,omitempty" validate:"dive"`
 	Deprecated   bool                                    `json:"deprecated,omitempty"`
-	Security     []SecurityRequirement                   `json:"security,omitempty"`
-	Servers      []Server                                `json:"servers,omitempty"`
+	Security     []SecurityRequirement                   `json:"security,omitempty" validate:"dive"`
+	Servers      []Server                                `json:"servers,omitempty" validate:"dive"`
 	Extensions   SpecificationExtension                  `json:"-"`
 }
 
@@ -530,7 +532,7 @@ type Parameter struct {
 	Name            string                                 `json:"name" validate:"required"`
 	In              Location                               `json:"in" validate:"required"`
 	Description     RichText                               `json:"description"`
-	Required        bool                                   `json:"required" validate:"required_if=In path"`
+	Required        bool                                   `json:"required" validate:"required_if=In 3"`
 	Deprecated      bool                                   `json:"deprecated,omitempty"`
 	AllowEmptyValue bool                                   `json:"allowEmptyValue,omitempty"` // Deprecated
 	Style           Style                                  `json:"style,omitempty"`
@@ -652,7 +654,7 @@ type Reference struct {
 	Ref string `json:"$ref" validate:"required,uri"`
 }
 
-func resolve(r Reference, v interface{}) any {
+func resolve(r *Reference, v interface{}) any {
 	parts := strings.Split(r.Ref, "/")
 	if parts[0] != "#" {
 		panic(fmt.Errorf("invalid reference format: %s", r.Ref))
@@ -672,21 +674,21 @@ type Schema struct {
 	Description RichText    `json:"description,omitempty"`
 	Default     interface{} `json:"default,omitempty"`
 
-	MultipleOf           int                                    `json:"multipleOf,omitempty" validate:"gt=0"`
+	MultipleOf           int                                    `json:"multipleOf,omitempty" validate:"omitempty,gt=0"`
 	Maximum              int                                    `json:"maximum,omitempty"`
 	ExclusiveMaximum     bool                                   `json:"exclusiveMaximum,omitempty"`
 	Minimum              int                                    `json:"minimum,omitempty"`
 	ExclusiveMinimum     bool                                   `json:"exclusiveMinimum,omitempty"`
-	MaxLength            int                                    `json:"maxLength,omitempty" validate:"gte=0"`
-	MinLength            int                                    `json:"minLength,omitempty" validate:"gte=0"`
+	MaxLength            int                                    `json:"maxLength,omitempty" validate:"omitempty,gte=0"`
+	MinLength            int                                    `json:"minLength,omitempty" validate:"omitempty,gte=0"`
 	Pattern              string                                 `json:"pattern,omitempty"`
 	Items                *ValueOrReferenceOf[Schema]            `json:"items,omitempty" validate:"required_if=Type 6"`
-	MaxItems             int                                    `json:"maxItems,omitempty" validate:"gte=0"`
-	MinItems             int                                    `json:"minItems,omitempty" validate:"gte=0"`
+	MaxItems             int                                    `json:"maxItems,omitempty" validate:"omitempty,gte=0"`
+	MinItems             int                                    `json:"minItems,omitempty" validate:"omitempty,gte=0"`
 	UniqueItems          bool                                   `json:"uniqueItems,omitempty"`
-	MaxProperties        int                                    `json:"maxProperties,omitempty" validate:"gte=0"`
-	MinProperties        int                                    `json:"minProperties,omitempty" validate:"gte=0"`
-	Required             []string                               `json:"required,omitempty" validate:"min=1,unique"`
+	MaxProperties        int                                    `json:"maxProperties,omitempty" validate:"omitempty,gte=0"`
+	MinProperties        int                                    `json:"minProperties,omitempty" validate:"omitempty,gte=0"`
+	Required             []string                               `json:"required,omitempty" validate:"omitempty,min=1,unique"`
 	Properties           map[string]ValueOrReferenceOf[Schema]  `json:"properties,omitempty"`
 	AdditionalProperties *Or[bool, *ValueOrReferenceOf[Schema]] `json:"additionalProperties,omitempty"`
 	Enum                 []interface{}                          `json:"enum,omitempty"`

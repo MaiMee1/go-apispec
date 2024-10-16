@@ -1,13 +1,15 @@
-package oas
+package oas_test
 
 import (
 	"encoding/json"
 	"fmt"
 	"testing"
+
+	"github.com/MaiMee1/go-apispec/oas/v3"
 )
 
 func TestOpenAPI_UnmarshalJSON(t *testing.T) {
-	document, err := New("testdata/petstore.json")
+	document, err := oas.New("testdata/petstore.json")
 	if err != nil {
 		t.Error(err)
 	}
@@ -27,7 +29,7 @@ func TestOpenAPI_UnmarshalJSON(t *testing.T) {
 
 func FuzzOpenAPI(f *testing.F) {
 	f.Fuzz(func(t *testing.T, s string) {
-		var document OpenAPI
+		var document oas.OpenAPI
 		err := json.Unmarshal([]byte(fmt.Sprintf(`{"openapi":"%s"}`, s)), &document)
 		if err != nil {
 			t.Fatal(err)
