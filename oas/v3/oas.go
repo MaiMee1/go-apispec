@@ -325,7 +325,7 @@ func (o ValueOrReferenceOf[T]) Resolve(v ...interface{}) T {
 	}
 
 	var t T
-	if o.Reference.Ref != "" {
+	if o.Reference != nil {
 		b, _ := json.Marshal(resolve(o.Reference, root))
 		_ = json.Unmarshal(b, &t)
 		setRoot(reflect.ValueOf(t), root)
