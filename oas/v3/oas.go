@@ -8,6 +8,8 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+
+	"github.com/MaiMee1/go-apispec/oas/iana"
 )
 
 type (
@@ -16,6 +18,7 @@ type (
 	Format          string
 	Location        int8
 	Style           int8
+	Scheme          int8
 )
 
 const (
@@ -118,6 +121,33 @@ func (s Style) String() string {
 	}
 }
 
+const (
+	ApiKeyScheme Scheme = iota + 1
+	HttpScheme
+	MutualTLSScheme
+	OAuth2Scheme
+	OpenIdConnectScheme
+)
+
+func (s Scheme) String() string {
+	switch s {
+	case ApiKeyScheme:
+		return "apiKey"
+	case HttpScheme:
+		return "http"
+	case MutualTLSScheme:
+		return "mutualTLS"
+	case OAuth2Scheme:
+		return "oauth2"
+	case OpenIdConnectScheme:
+		return "openIdConnect"
+	case 0:
+		return "<0>"
+	default:
+		panic(s)
+	}
+}
+
 func (v SemanticVersion) Validate() error {
 	// TODO:
 	return nil
@@ -209,6 +239,33 @@ func (s *Style) UnmarshalJSON(b []byte) error {
 		*s = DeepObjectStyle
 	default:
 		return fmt.Errorf("invalid style %q", st)
+	}
+	return nil
+}
+
+func (s Scheme) MarshalJSON() ([]byte, error) {
+	return json.Marshal(s.String())
+}
+
+//goland:noinspection GoMixedReceiverTypes
+func (s *Scheme) UnmarshalJSON(b []byte) error {
+	var st string
+	if err := json.Unmarshal(b, &st); err != nil {
+		return err
+	}
+	switch st {
+	case ApiKeyScheme.String():
+		*s = ApiKeyScheme
+	case HttpScheme.String():
+		*s = HttpScheme
+	case MutualTLSScheme.String():
+		*s = MutualTLSScheme
+	case OAuth2Scheme.String():
+		*s = OAuth2Scheme
+	case OpenIdConnectScheme.String():
+		*s = OpenIdConnectScheme
+	default:
+		return fmt.Errorf("invalid scheme %q", st)
 	}
 	return nil
 }
@@ -779,20 +836,15 @@ type XML struct {
 	// TODO:
 }
 
-var ApiKeyScheme = SecurityScheme{
-	Type: "apiKey",
-	// TODO: schemes and flows
-}
-
 type SecurityScheme struct {
-	Type             string                 `json:"type,omitempty" validate:"required,oneof=apiKey http bearer oauth2 openIdConnect"`
+	Type             Scheme                 `json:"type" validate:"required"`
 	Description      RichText               `json:"description,omitempty"`
-	Name             string                 `json:"name,omitempty"  validate:"required_if=Type apiKey,excluded_unless=Type apiKey"`
-	In               string                 `json:"in,omitempty"  validate:"required_if=Type apiKey,excluded_unless=Type apiKey,oneof=query header cookie"`
-	Scheme           string                 `json:"scheme,omitempty" validate:"required_if=Type http,excluded_unless=Type http,oneof=basic bearer digest"`
-	BearerFormat     string                 `json:"bearerFormat,omitempty" validate:"excluded_unless=Type bearer"`
-	Flows            *OAuthFlows            `json:"flows,omitempty" validate:"required_if=Type oauth2,excluded_unless=Type oauth2"`
-	OpenIdConnectUrl string                 `json:"openIdConnectUrl,omitempty" validate:"url,required_if=Type openIdConnect,excluded_unless=Type openIdConnect"`
+	Name             string                 `json:"name,omitempty"  validate:"required_if=Type 1,excluded_unless=Type 1"`
+	In               Location               `json:"in,omitempty"  validate:"required_if=Type 1,excluded_unless=Type 1,omitempty,oneof=1 2 4"`
+	Scheme           iana.AuthScheme        `json:"scheme,omitempty" validate:"required_if=Type 2,excluded_unless=Type 2"`
+	BearerFormat     string                 `json:"bearerFormat,omitempty" validate:"excluded_unless=Scheme bearer"`
+	Flows            *OAuthFlows            `json:"flows,omitempty" validate:"required_if=Type 4,excluded_unless=Type 4"`
+	OpenIdConnectUrl string                 `json:"openIdConnectUrl,omitempty" validate:"required_if=Type 5,excluded_unless=Type 5,omitempty,url"`
 	Extensions       SpecificationExtension `json:"-"`
 }
 
