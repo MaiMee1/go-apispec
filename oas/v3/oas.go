@@ -353,7 +353,7 @@ type Info struct {
 }
 
 type Contact struct {
-	Name       string                 `json:"name"`
+	Name       string                 `json:"name,omitempty"`
 	Url        string                 `json:"url,omitempty" validate:"omitempty,url"`
 	Email      string                 `json:"email,omitempty" validate:"omitempty,email"`
 	Extensions SpecificationExtension `json:"-"`
@@ -584,8 +584,8 @@ type Header struct {
 }
 
 type Tag struct {
-	Summary      string                 `json:"summary" validate:"required"`
-	Description  RichText               `json:"description"`
+	Name         string                 `json:"name" validate:"required"`
+	Description  RichText               `json:"description,omitempty"`
 	ExternalDocs *ExternalDocumentation `json:"externalDocs,omitempty"`
 	Extensions   SpecificationExtension `json:"-"`
 }
