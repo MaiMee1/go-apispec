@@ -651,7 +651,7 @@ type Tag struct {
 
 // Reference is defined by https://datatracker.ietf.org/doc/html/draft-pbryan-zyp-json-ref-03d follows the same structure, behavior and rules.
 type Reference struct {
-	Ref string `json:"$ref" validate:"required,uri"`
+	Ref string `json:"$ref" validate:"required,url_fragment"`
 }
 
 func resolve(r *Reference, v interface{}) any {
