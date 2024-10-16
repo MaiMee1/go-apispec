@@ -851,19 +851,46 @@ type SecurityScheme struct {
 }
 
 type OAuthFlows struct {
-	Implicit          *OAuthFlow             `json:"implicit,omitempty"`
-	Password          *OAuthFlow             `json:"password,omitempty"`
-	ClientCredentials *OAuthFlow             `json:"clientCredentials,omitempty"`
-	AuthorizationCode *OAuthFlow             `json:"authorizationCode,omitempty"`
-	Extensions        SpecificationExtension `json:"-"`
+	Implicit          *ImplicitOAuthFlow          `json:"implicit,omitempty"`
+	Password          *PasswordOAuthFlow          `json:"password,omitempty"`
+	ClientCredentials *ClientCredentialsOAuthFlow `json:"clientCredentials,omitempty"`
+	AuthorizationCode *AuthorizationCodeOAuthFlow `json:"authorizationCode,omitempty"`
+	Extensions        SpecificationExtension      `json:"-"`
 }
 
-type OAuthFlow struct {
-	AuthorizationUrl string                 `json:"authorizationUrl,omitempty" validate:"url"`
-	TokenUrl         string                 `json:"tokenUrl,omitempty" validate:"url"`
-	RefreshUrl       string                 `json:"refreshUrl,omitempty" validate:"url"`
-	Scopes           map[string]string      `json:"scopes,omitempty"`
-	Extensions       SpecificationExtension `json:"-"`
+type ImplicitOAuthFlow struct {
+	authorizationUrlMixin
+	oAuthFlow
+}
+
+type PasswordOAuthFlow struct {
+	tokenUrlMixin
+	oAuthFlow
+}
+
+type ClientCredentialsOAuthFlow struct {
+	tokenUrlMixin
+	oAuthFlow
+}
+
+type AuthorizationCodeOAuthFlow struct {
+	authorizationUrlMixin
+	tokenUrlMixin
+	oAuthFlow
+}
+
+type authorizationUrlMixin struct {
+	AuthorizationUrl string `json:"authorizationUrl" validate:"required,url"`
+}
+
+type tokenUrlMixin struct {
+	TokenUrl string `json:"tokenUrl" validate:"required,url"`
+}
+
+type oAuthFlow struct {
+	RefreshUrl string                 `json:"refreshUrl,omitempty" validate:"omitempty,url"`
+	Scopes     map[string]string      `json:"scopes" validate:"required"`
+	Extensions SpecificationExtension `json:"-"`
 }
 
 type SecurityRequirement map[string][]string
