@@ -5,11 +5,7 @@ import (
 	"os"
 	"reflect"
 	"strings"
-
-	"github.com/go-playground/validator/v10"
 )
-
-var validate = validator.New(validator.WithRequiredStructEnabled())
 
 func New(filename string) (*OpenAPI, error) {
 	file, err := os.ReadFile(filename)
