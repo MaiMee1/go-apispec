@@ -63,8 +63,8 @@ func WithLicense(name string, url string) Option {
 	})
 }
 
-func WithServer(protocol, hostname string, port uint16, pathname string) Option {
-	srv, err := server.New(protocol, hostname, port, pathname)
+func WithServer(protocol, hostname string, port uint16, pathname string, opts ...server.Option) Option {
+	srv, err := server.New(protocol, hostname, port, pathname, opts...)
 	if err != nil {
 		panic(err)
 	}
@@ -188,14 +188,21 @@ func WithSecurity(requirements ...oas.SecurityRequirement) Option {
 	})
 }
 
-func WithTags(tags ...oas.Tag) Option {
+func WithTag(name string, description oas.RichText) Option {
 	return optionFunc(func(api *API) {
-		api.document.Tags = tags
+		api.document.Tags = append(api.document.Tags, oas.Tag{
+			Name:         name,
+			Description:  description,
+			ExternalDocs: nil,
+		})
 	})
 }
 
-func WithExternalDocs(docs oas.ExternalDocumentation) Option {
+func WithExternalDocs(description oas.RichText, url string) Option {
 	return optionFunc(func(api *API) {
-		api.document.ExternalDocs = &docs
+		api.document.ExternalDocs = &oas.ExternalDocumentation{
+			Description: description,
+			Url:         url,
+		}
 	})
 }

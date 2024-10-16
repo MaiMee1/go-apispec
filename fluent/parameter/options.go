@@ -63,9 +63,101 @@ func WithDeprecated() Option {
 	})
 }
 
-func WithSerialization(style oas.Style, explode bool) Option {
+// WithMatrixStyle use Path-style parameters defined by RFC6570.
+//
+// See section 3.2.7. Path-Style Parameter Expansion: {;var}.
+//
+// Assume a parameter named color has one of the following values:
+//
+//	"blue"
+//	[]string{"blue","black","brown"}
+//	map[string]int{ "R": 100, "G": 200, "B": 150 }
+//
+//	explode=false           	explode=true
+//	;color                  	;color
+//	;color=blue             	;color=blue
+//	;color=blue,black,brown 	;color=blue;color=black;color=brown
+//	;color=R,100,G,200,B,150	;R=100;G=200;B=150
+func WithMatrixStyle(explode bool) Option {
 	return optionFunc(func(parameter *oas.Parameter) {
-		parameter.Style = style
+		if parameter.In != oas.PathLocation {
+			panic("in must be path")
+		}
+		parameter.Style = oas.MatrixStyle
+		parameter.Explode = &explode
+	})
+}
+
+// WithLabelStyle use Label style parameters defined by RFC6570.
+//
+// See section 3.2.5. Label Expansion with Dot-Prefix: {.var}.
+//
+// Assume a parameter named color has one of the following values:
+//
+//	"blue"
+//	[]string{"blue","black","brown"}
+//	map[string]int{ "R": 100, "G": 200, "B": 150 }
+//
+//	explode=false     	explode=true
+//	.                 	.
+//	.blue             	.blue
+//	.blue.black.brown 	.blue.black.brown
+//	.R.100.G.200.B.150	.R=100.G=200.B=150
+func WithLabelStyle(explode bool) Option {
+	return optionFunc(func(parameter *oas.Parameter) {
+		if parameter.In != oas.PathLocation {
+			panic("in must be path")
+		}
+		parameter.Style = oas.LabelStyle
+		parameter.Explode = &explode
+	})
+}
+
+// WithFormStyle use Form style parameters defined by RFC6570.
+//
+// See section 3.2.8. Form-Style Query Expansion: {?var}
+//
+// Assume a parameter named color has one of the following values:
+//
+//	"blue"
+//	[]string{"blue","black","brown"}
+//	map[string]int{ "R": 100, "G": 200, "B": 150 }
+//
+//	explode=false         	explode=true
+//	color=                 	color=
+//	color=blue             	color=blue
+//	color=blue,black,brown 	color=blue&color=black&color=brown
+//	color=R,100,G,200,B,150	R=100&G=200&B=150
+func WithFormStyle(explode bool) Option {
+	return optionFunc(func(parameter *oas.Parameter) {
+		if parameter.In != oas.QueryLocation && parameter.In != oas.CookieLocation {
+			panic("in must be query or cookie")
+		}
+		parameter.Style = oas.FormStyle
+		parameter.Explode = &explode
+	})
+}
+
+// WithSimpleStyle use Simple style parameters defined by RFC6570.
+//
+// See section 3.2.2. Simple String Expansion: {var}
+//
+// Assume a parameter named color has one of the following values:
+//
+//	"blue"
+//	[]string{"blue","black","brown"}
+//	map[string]int{ "R": 100, "G": 200, "B": 150 }
+//
+//	explode=false    	explode=true
+//	blue             	blue
+//	blue,black,brown 	blue,black,brown
+//	R,100,G,200,B,150	R=100,G=200,B=150
+func WithSimpleStyle(explode bool) Option {
+	return optionFunc(func(parameter *oas.Parameter) {
+		if parameter.In != oas.QueryLocation && parameter.In != oas.CookieLocation {
+			panic("in must be query or cookie")
+		}
+		parameter.Style = oas.FormStyle
 		parameter.Explode = &explode
 	})
 }
