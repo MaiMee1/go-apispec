@@ -9,7 +9,6 @@ import (
 	"github.com/MaiMee1/go-apispec/oas/v3"
 )
 
-// An Option configures a Logger.
 type Option interface {
 	apply(*API)
 }

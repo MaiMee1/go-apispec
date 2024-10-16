@@ -4,7 +4,7 @@ go 1.23
 
 toolchain go1.23.2
 
-require github.com/MaiMee1/go-apispec/oas v0.0.0-20241016020310-2f0409e32a8b
+require github.com/MaiMee1/go-apispec/oas v0.0.0-20241016143412-2c1645df765f
 
 require (
 	github.com/gabriel-vasile/mimetype v1.4.3 // indirect

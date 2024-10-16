@@ -7,7 +7,6 @@ import (
 	"github.com/MaiMee1/go-apispec/oas/v3"
 )
 
-// An Option configures a Logger.
 type Option interface {
 	apply(*oas.Parameter)
 }
@@ -181,7 +180,7 @@ func WithSchema(schema oas.Schema) Option {
 func WithSchemaReference(ref oas.Reference) Option {
 	return optionFunc(func(parameter *oas.Parameter) {
 		parameter.Schema = &oas.ValueOrReferenceOf[oas.Schema]{
-			Ref: ref,
+			Reference: &ref,
 		}
 	})
 }
@@ -206,7 +205,7 @@ func WithComplexSerialization(keyAndValues ...interface{}) Option {
 			case oas.Reference:
 				parameter.Content[key] = oas.MediaType{
 					Schema: oas.ValueOrReferenceOf[oas.Schema]{
-						Ref: oas.Reference{},
+						Reference: &v,
 					},
 					Example:  nil,
 					Examples: nil,

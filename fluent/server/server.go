@@ -25,10 +25,7 @@ func New(protocol, hostname string, port uint16, pathname string, opts ...Option
 		return nil, err
 	}
 	server := &oas.Server{
-		Url:         oas.UrlTemplate(uri.String()),
-		Description: "",
-		Variables:   nil,
-		Extensions:  nil,
+		Url: oas.UrlTemplate(uri.String()),
 	}
 	for _, opt := range opts {
 		opt.apply(server)

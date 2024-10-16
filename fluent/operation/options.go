@@ -8,7 +8,6 @@ import (
 	"github.com/MaiMee1/go-apispec/oas/v3"
 )
 
-// An Option configures a Logger.
 type Option interface {
 	apply(*oas.Operation)
 }
@@ -51,7 +50,7 @@ func WithParams(parameters ...oas.Parameter) Option {
 func WithParamReference(ref oas.Reference) Option {
 	return optionFunc(func(operation *oas.Operation) {
 		operation.Parameters = append(operation.Parameters, oas.ValueOrReferenceOf[oas.Parameter]{
-			Ref: ref,
+			Reference: &ref,
 		})
 	})
 }
@@ -80,7 +79,7 @@ func WithBody(description oas.RichText, required bool, keyAndValues ...interface
 		case oas.Reference:
 			body.Content[key] = oas.MediaType{
 				Schema: oas.ValueOrReferenceOf[oas.Schema]{
-					Ref: oas.Reference{},
+					Reference: &oas.Reference{},
 				},
 				Example:  nil,
 				Examples: nil,
@@ -97,7 +96,7 @@ func WithBody(description oas.RichText, required bool, keyAndValues ...interface
 func WithBodyReference(ref oas.Reference) Option {
 	return optionFunc(func(operation *oas.Operation) {
 		operation.RequestBody = &oas.ValueOrReferenceOf[oas.RequestBody]{
-			Ref: ref,
+			Reference: &ref,
 		}
 	})
 }
@@ -132,7 +131,7 @@ func WithResponse(code int, description oas.RichText, keyAndValues ...interface{
 		case oas.Reference:
 			response.Content[key] = oas.MediaType{
 				Schema: oas.ValueOrReferenceOf[oas.Schema]{
-					Ref: oas.Reference{},
+					Reference: &v,
 				},
 				Example:  nil,
 				Examples: nil,
@@ -159,7 +158,7 @@ func WithResponseReference(code int, ref oas.Reference) Option {
 			operation.Responses = make(oas.Responses)
 		}
 		operation.Responses[status] = oas.ValueOrReferenceOf[oas.Response]{
-			Ref: ref,
+			Reference: &ref,
 		}
 	})
 }
@@ -221,7 +220,7 @@ func WithCallback(name string, method string, url oas.RuntimeExpression, opts ..
 //		itemOrRef, ok := callback.Value[url]
 //		if !ok {
 //			itemOrRef = oas.ValueOrReferenceOf[oas.PathItem]{
-//				Ref: ref,
+//				Reference: ref,
 //			}
 //		}
 //		callback.Value[url] = itemOrRef
@@ -237,7 +236,7 @@ func WithCallbackReference(name string, ref oas.Reference) Option {
 		callback, ok := operation.Callbacks[name]
 		if !ok {
 			callback = oas.ValueOrReferenceOf[oas.Callback]{
-				Ref: ref,
+				Reference: &ref,
 			}
 		}
 		operation.Callbacks[name] = callback
