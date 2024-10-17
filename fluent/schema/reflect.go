@@ -93,7 +93,6 @@ func parseType(t reflect.Type) oas.Type {
 func buildProperty(t reflect.Type) (properties map[string]oas.ValueOrReferenceOf[oas.Schema], required []string) {
 	//fmt.Println("buildProperty", t)
 	properties = make(map[string]oas.ValueOrReferenceOf[oas.Schema])
-	required = make([]string, 0)
 	for i := 0; i < t.NumField(); i++ {
 		field := t.Field(i)
 
