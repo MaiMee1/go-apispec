@@ -396,8 +396,8 @@ type OpenAPI struct {
 	Extensions   SpecificationExtension                  `json:"-"`
 }
 
-func (o *OpenAPI) Validate() error {
-	return validate.Struct(o)
+func (doc *OpenAPI) Validate() error {
+	return validate.Struct(doc)
 }
 
 // Info provides metadata about the API. The metadata MAY be used by the clients if needed, and MAY be presented in editing or documentation generation tools for convenience.
