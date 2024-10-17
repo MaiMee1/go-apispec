@@ -28,17 +28,17 @@ func TestFluent(t *testing.T) {
 		specs.WithOperation("getAsdsd", http.MethodGet, "/asfaf",
 			operation.WithSummary(""),
 			operation.WithParams(
-				parameter.Query("page", "", false),
-				parameter.Query("limit", "", false),
+				parameter.Query("page", "", false, parameter.WithSchemaFor[int]()),
+				parameter.Query("limit", "", false, parameter.WithSchemaFor[int]()),
 			),
-			operation.WithBody("", true, "application/json", 1),
-			operation.WithResponse(http.StatusOK, "successful operation",
-				"application/json", schema.For[Test]()),
+			operation.WithBody("", true, "application/json", schema.For[int]()),
+			operation.WithResponse(http.StatusOK, "successful operation", "application/json", schema.RefFor[Test]()),
+			//operation.WithResponse(http.StatusBadRequest, "bad operation", "application/json", schema.For[Test]()),
 		),
+		specs.WithSchemaDefinitions(schema.Cached()),
 	)
 	if err != nil {
-		t.Fatal(err)
+		t.Error(err)
 	}
-	_ = api
 	t.Log(api.Json())
 }

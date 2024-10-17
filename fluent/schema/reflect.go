@@ -265,13 +265,3 @@ func define(t reflect.Type) map[string]oas.Schema {
 	}
 	return objMap
 }
-
-//func MakeSchema(prototype interface{}) oas.Schema {
-//	name, obj := defineObject(prototype, false)
-//	//schema := &oas.Schema{
-//	//	Prototype: prototype,
-//	//	Reference:       makeRef(name),
-//	//}
-//	_ = makeRef(name)
-//	return obj
-//}

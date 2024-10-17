@@ -158,6 +158,19 @@ func WithComponents(keyAndValues ...interface{}) Option {
 		panic("keyAndValues must have an even number")
 	}
 	return optionFunc(func(api *API) {
+		api.document.Components = oas.Components{
+			Schemas:         make(map[string]oas.Schema),
+			Responses:       make(map[string]oas.Response),
+			Parameters:      make(map[string]oas.Parameter),
+			Examples:        make(map[string]oas.Example),
+			RequestBodies:   make(map[string]oas.RequestBody),
+			Headers:         make(map[string]oas.Header),
+			SecuritySchemes: make(map[string]oas.SecurityScheme),
+			Links:           make(map[string]oas.Link),
+			Callbacks:       make(map[string]oas.Callback),
+			PathItems:       make(map[string]oas.PathItem),
+			Extensions:      make(oas.SpecificationExtension),
+		}
 		for i := 0; i < len(keyAndValues)/2; i++ {
 			key := keyAndValues[i*2].(string)
 			value := keyAndValues[i*2+1]
