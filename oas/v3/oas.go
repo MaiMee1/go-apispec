@@ -688,7 +688,7 @@ type Schema struct {
 	UniqueItems          bool                                   `json:"uniqueItems,omitempty"`
 	MaxProperties        int                                    `json:"maxProperties,omitempty" validate:"omitempty,gte=0"`
 	MinProperties        int                                    `json:"minProperties,omitempty" validate:"omitempty,gte=0"`
-	Required             []string                               `json:"required,omitempty" validate:"omitempty,min=1,unique"`
+	Required             []string                               `json:"required,omitempty" validate:"omitnil,min=1,unique"`
 	Properties           map[string]ValueOrReferenceOf[Schema]  `json:"properties,omitempty"`
 	AdditionalProperties *Or[bool, *ValueOrReferenceOf[Schema]] `json:"additionalProperties,omitempty"`
 	Enum                 []interface{}                          `json:"enum,omitempty"`
