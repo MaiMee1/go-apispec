@@ -83,15 +83,28 @@ func (doc *OpenAPI) IterRef() iter.Seq[*Reference] {
 	}
 }
 
-func (doc *OpenAPI) IterSchemaOrRef() iter.Seq[ValueOrReferenceOf[Schema]] {
-	return func(yield func(ValueOrReferenceOf[Schema]) bool) {
-		v := reflect.ValueOf(doc)
-		for v := range iterValueOrReference(v, false) {
+func (doc *OpenAPI) IterSchemaOrRef() iter.Seq[*ValueOrReferenceOf[Schema]] {
+	return func(yield func(*ValueOrReferenceOf[Schema]) bool) {
+		for v := range iterValueOrReference(reflect.ValueOf(doc.Paths), true) {
 			if v.Type().Name() == valueOrReferenceOfSchema {
-				if or, ok := v.Interface().(ValueOrReferenceOf[Schema]); ok {
+				p := reflect.New(v.Type())
+				p.Elem().Set(v)
+				if or, ok := p.Interface().(*ValueOrReferenceOf[Schema]); ok {
 					yield(or)
 				}
+				v.Set(p.Elem())
 			}
 		}
+		for v := range iterValueOrReference(reflect.ValueOf(doc.Webhooks), true) {
+			if v.Type().Name() == valueOrReferenceOfSchema {
+				p := reflect.New(v.Type())
+				p.Elem().Set(v)
+				if or, ok := p.Interface().(*ValueOrReferenceOf[Schema]); ok {
+					yield(or)
+				}
+				v.Set(p.Elem())
+			}
+		}
+		// do not yield Components
 	}
 }
