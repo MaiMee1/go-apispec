@@ -2,6 +2,8 @@ package specs
 
 import (
 	"encoding/json"
+	"fmt"
+	"slices"
 
 	"github.com/MaiMee1/go-apispec/oas/v3"
 )
@@ -41,4 +43,28 @@ func (api *API) Json() string {
 		panic(err)
 	}
 	return string(b)
+}
+
+func WithSchemaDefinitions(definitions map[string]*oas.Schema) Option {
+	return optionFunc(func(api *API) {
+		if api.document.Components.Schemas == nil {
+			api.document.Components.Schemas = make(map[string]oas.Schema)
+		}
+		var needed []*oas.ValueOrReferenceOf[oas.Schema]
+		for schema := range api.document.IterSchemaOrRef() {
+			if schema.Reference != nil {
+				needed = append(needed, schema)
+			}
+		}
+		for name, schema := range definitions {
+			if slices.ContainsFunc(needed, func(schema *oas.ValueOrReferenceOf[oas.Schema]) bool {
+				if schema.Reference != nil && schema.Reference.Ref == fmt.Sprintf("#/components/schemas/%v", name) {
+					return true
+				}
+				return false
+			}) {
+				api.document.Components.Schemas[name] = *schema
+			}
+		}
+	})
 }
