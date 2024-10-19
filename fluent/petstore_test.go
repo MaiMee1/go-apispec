@@ -12,7 +12,14 @@ import (
 	"github.com/MaiMee1/go-apispec/oas/v3"
 )
 
-type Pet struct{}
+type Tag struct{}
+type Pet struct {
+	Id        int64    `json:"id,omitempty"`
+	Name      string   `json:"name" validate:"required"`
+	PhotoUrls []string `json:"photoUrls" validate:"required"`
+	Tags      []Tag    `json:"tags,omitempty"`
+	Status    string   `json:"status,omitempty"`
+}
 type ApiResponse struct{}
 
 func TestFluent_PetStore(t *testing.T) {

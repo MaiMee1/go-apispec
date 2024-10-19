@@ -1,13 +1,16 @@
 package schema
 
 import (
+	"fmt"
 	"reflect"
+	"sync"
 
+	"github.com/MaiMee1/go-apispec/oas/jsonschema"
 	"github.com/MaiMee1/go-apispec/oas/v3"
 )
 
 func New(typ reflect.Type, opts ...Option) oas.Schema {
-	_, schema := defineObject(typ, false)
+	schema := objectSchema(typ)
 	for _, opt := range opts {
 		opt.apply(&schema)
 	}
@@ -21,16 +24,19 @@ func For[T any](opts ...Option) oas.Schema {
 
 func RefFor[T any](opts ...Option) oas.Reference {
 	typ := reflect.TypeFor[T]()
-	name, schema := defineObject(typ, false)
+	schema := objectSchema(typ)
 	for _, opt := range opts {
 		opt.apply(&schema)
 	}
-	ref := oas.Reference{
-		Ref: makeRef(name),
+	if schema.Type.Has(jsonschema.ObjectType) {
+		ref := oas.Reference{
+			Ref: fmt.Sprintf("#/components/schemas/%s", schema.Extensions["Name"].(string)),
+		}
+		return ref
 	}
-	return ref
+	panic(fmt.Errorf("%v should be convertable to an object", typ))
 }
 
-func Cached() map[string]*oas.Schema {
-	return cache
+func Cached() *sync.Map {
+	return &cache
 }

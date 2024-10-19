@@ -1,220 +1,319 @@
 package schema
 
 import (
-	"fmt"
+	"maps"
 	"reflect"
+	"slices"
 	"strings"
+	"sync"
 
+	"github.com/MaiMee1/go-apispec/oas/jsonschema"
 	"github.com/MaiMee1/go-apispec/oas/v3"
 )
 
-func WithMask(keys ...string) Option {
-	return optionFunc(func(schema *oas.Schema) {
-		for _, key := range keys {
-			delete(schema.Properties, key)
-		}
-	})
+// fallbackKindToFormat uses Go type names as fallback for JSON serializable values
+var fallbackKindToFormat = []oas.Format{
+	reflect.Invalid:    "",
+	reflect.Bool:       "bool",
+	reflect.Int:        "int",
+	reflect.Int8:       "int8",
+	reflect.Int16:      "int16",
+	reflect.Int32:      "int32",
+	reflect.Int64:      "int64",
+	reflect.Uint:       "uint",
+	reflect.Uint8:      "uint8",
+	reflect.Uint16:     "uint16",
+	reflect.Uint32:     "uint32",
+	reflect.Uint64:     "uint64",
+	reflect.Uintptr:    "uintptr",
+	reflect.Float32:    "float32",
+	reflect.Float64:    "float64",
+	reflect.Complex64:  "complex64",
+	reflect.Complex128: "complex128",
 }
 
-func makeRef(name string) string {
-	return fmt.Sprintf("#/components/schemas/%v", name)
+// kindToFormat defines mapping from Go [reflect.Kind] to canonical [oas.Format]
+var kindToFormat = map[reflect.Kind]oas.Format{
+	reflect.Int32:   oas.Int32Format,
+	reflect.Int64:   oas.Int64Format,
+	reflect.Float32: oas.FloatFormat,
+	reflect.Float64: oas.DoubleFormat,
 }
 
-func makeName(t reflect.Type) string {
+func format2(t reflect.Type, fallback bool) oas.Format {
+	if format, ok := kindToFormat[t.Kind()]; ok {
+		return format
+	}
+	if fallback {
+		return fallbackKindToFormat[t.Kind()]
+	}
+	return oas.NoFormat
+}
+
+func dataType2(t reflect.Type) oas.Type {
+	switch t.Kind() {
+	case reflect.Invalid, reflect.Pointer, reflect.UnsafePointer, reflect.Complex64, reflect.Complex128, reflect.Chan, reflect.Func:
+		return 0
+	case reflect.Bool:
+		return jsonschema.BooleanType
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
+		reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
+		return jsonschema.IntegerType
+	case reflect.Float32, reflect.Float64:
+		return jsonschema.NumberType
+	case reflect.Array, reflect.Slice:
+		return jsonschema.ArrayType
+	case reflect.Interface, reflect.Map, reflect.Struct:
+		return jsonschema.ObjectType
+	case reflect.String:
+		return jsonschema.StringType
+	}
+	panic("unreachable")
+}
+
+func name2(t reflect.Type) string {
 	name := t.Name()
 	if name == "" {
-		if t.Kind() == reflect.Interface {
+		switch t.Kind() {
+		case reflect.Interface:
 			name = "any"
-		} else {
-			name = "ptr" + makeName(t.Elem())
+		case reflect.Pointer:
+			name = "ptr"
+		default:
+			panic(t)
 		}
 	}
-	pkgPath := t.PkgPath()
-	if pkgPath != "." {
-		pkgPath += "."
-	}
-	fullName := pkgPath + name
-	fullName = strings.ReplaceAll(fullName, "/", ".") // updated
-	return strings.ReplaceAll(fullName, "-", "_")
+	return t.PkgPath() + name
 }
 
-func parseFormat(t reflect.Type) oas.Format {
-	kind := t.Kind()
-	if kind == reflect.Ptr {
-		return parseFormat(t.Elem())
-	}
+type StringFilter = func(string) string
 
-	switch kind {
-	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-		return oas.NoFormat
-	case reflect.Int32:
-		return oas.Int32Format
-	case reflect.Int64:
-		return oas.Int64Format
-	case reflect.Float32:
-		return oas.FloatFormat
-	case reflect.Float64:
-		return oas.DoubleFormat
-	default:
-		return oas.NoFormat
-	}
+var DefaultEncoder = Encoder{
+	nameFilter: func(qualifiedName string) string {
+		qualifiedName = strings.ReplaceAll(qualifiedName, "/", ".")
+		qualifiedName = strings.ReplaceAll(qualifiedName, "-", "_")
+		return qualifiedName
+	},
 }
 
-func parseType(t reflect.Type) oas.Type {
-	kind := t.Kind()
-	if kind == reflect.Ptr {
-		return parseType(t.Elem())
-	}
-
-	// can cache here
-	//if pt := Get(t.String()); pt != Unknown {
-	//	return pt
-	//}
-
-	switch kind {
-	case reflect.Bool:
-		return oas.BooleanType
-	case reflect.Float32, reflect.Float64:
-		return oas.NumberType
-	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
-		reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-		return oas.IntegerType
-	case reflect.String:
-		return oas.StringType
-	case reflect.Array, reflect.Slice:
-		return oas.ArrayType
-	case reflect.Struct, reflect.Map, reflect.Interface:
-		return oas.ObjectType
-	default:
-		return 0
-	}
+type Encoder struct {
+	nameFilter StringFilter
 }
 
-func buildProperty(t reflect.Type) (properties map[string]oas.ValueOrReferenceOf[oas.Schema], required []string) {
-	//fmt.Println("buildProperty", t)
+func (enc *Encoder) format(t reflect.Type) oas.Format {
+	return format2(t, false)
+}
+
+func (enc *Encoder) dataType(t reflect.Type) oas.Type {
+	return dataType2(t)
+}
+
+func (enc *Encoder) makeName(t reflect.Type) string {
+	return enc.nameFilter(name2(t))
+}
+
+func isRequired(sf reflect.StructField) bool {
+	tag, ok := sf.Tag.Lookup("validate")
+	if !ok {
+		return false
+	}
+	if tag == "-" {
+		return false
+	}
+	tags := strings.Split(tag, ",")
+	return slices.Contains(tags, "required")
+}
+
+func diveStruct(t reflect.Type) (properties map[string]oas.ValueOrReferenceOf[oas.Schema], required map[string]struct{}) {
+	required = make(map[string]struct{})
 	properties = make(map[string]oas.ValueOrReferenceOf[oas.Schema])
 	for i := 0; i < t.NumField(); i++ {
-		field := t.Field(i)
+		sf := t.Field(i)
 
-		// skip unexported fields
-		if !field.IsExported() {
-			continue
-		}
-		if field.Anonymous {
-			// 暂不处理匿名结构的required
-			ps, _ := buildProperty(field.Type)
-			for name, p := range ps {
-				properties[name] = p
+		// handle embedded fields
+		if sf.Anonymous {
+			t := sf.Type
+			if t.Kind() == reflect.Pointer {
+				t = t.Elem()
 			}
-			continue
-		}
-
-		// determine the json name of the field
-		name := strings.TrimSpace(field.Tag.Get("json"))
-		if name == "" || strings.HasPrefix(name, ",") {
-			name = field.Name
-
-		} else {
-			// strip out things like , omitempty
-			parts := strings.Split(name, ",")
-			name = parts[0]
-		}
-
-		parts := strings.Split(name, ",") // foo,omitempty => foo
-		name = parts[0]
-		if name == "-" {
-			// honor json ignore tag
-			continue
-		}
-
-		var p oas.Schema
-		jsonTag := field.Tag.Get("json")
-		if strings.Contains(jsonTag, ",string") {
-			p.Type = oas.StringType
-			p.Extensions["GoType"] = field.Type
-		} else {
-			_, p = defineObject(field.Type, false)
-		}
-
-		// determine the extra info of the field
-		if validateTag := field.Tag.Get("validate"); validateTag != "" {
-			parts := strings.Split(validateTag, ",")
-			for _, part := range parts {
-				if part == "required" {
-					required = append(required, name)
-					break
+			if !sf.IsExported() && t.Kind() != reflect.Struct {
+				// skip embedded fields of unexported non-struct types
+				continue
+			}
+			// dive into embedded fields of un/exported struct types
+			props, req := diveStruct(t)
+			for name, prop := range props {
+				if _, ok := properties[name]; ok {
+					panic("promoted fields in conflict")
 				}
+				properties[name] = prop
 			}
+			for name := range req {
+				required[name] = struct{}{}
+			}
+			continue
+		} else if !sf.IsExported() {
+			// skip unexported non-embedded fields
+			continue
 		}
-		// TODO: description from comments
+
+		tag := sf.Tag.Get("json")
+		if tag == "-" {
+			// skip non-serialized fields
+			continue
+		}
+
+		name, jsonOpts := parseTag(tag)
+		if !isValidTag(name) {
+			// fallback to field name
+			name = sf.Name
+		}
+
+		// check for duplicate names
+		if _, ok := properties[name]; ok {
+			panic("fields in conflict")
+		}
+
+		schema := oas.Schema{
+			Extensions: oas.SpecificationExtension{
+				"GoType": sf.Type,
+			},
+		}
+		if jsonOpts.Contains("string") {
+			// encoding/json only add quotes to strings, floats, integers, and booleans
+			switch sf.Type.Kind() {
+			case reflect.String:
+				schema.Type = jsonschema.StringType
+			case reflect.Bool,
+				reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
+				reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr,
+				reflect.Float32, reflect.Float64:
+				schema.Type = jsonschema.StringType
+				schema.Format = format2(sf.Type, true)
+			default:
+				schema = objectSchema(sf.Type)
+			}
+		} else {
+			schema = objectSchema(sf.Type)
+		}
+
+		if isRequired(sf) {
+			required[name] = struct{}{}
+			// JSON Schema's "required" does not mean the value cannot be null (just that the key must be present)
+			// but validate tag's "required" expects not nil value
+			schema.Type = schema.Type & ^jsonschema.NullType
+		}
+
 		properties[name] = oas.ValueOrReferenceOf[oas.Schema]{
-			Value: p,
+			Value: schema,
 		}
 	}
-	return properties, required
+
+	return
 }
 
-var cache = make(map[string]*oas.Schema)
+var cache = sync.Map{} // map[string]*oas.Schema
 
-func defineObject(t reflect.Type, nullable bool) (string, oas.Schema) {
-	//fmt.Println("defineObject", t, nullable)
-	kind := t.Kind()
-	if kind == reflect.Ptr {
-		// unwrap pointer
-		return defineObject(t.Elem(), true)
+func objectSchema(t reflect.Type) (schema oas.Schema) {
+	var nullable bool
+	// some types allow nil values
+	switch t.Kind() {
+	case reflect.Pointer,
+		reflect.Interface, reflect.Map,
+		reflect.Array, reflect.Slice:
+		nullable = true
+	default:
 	}
 
-	name := makeName(t)
-	// TODO: cache better
-	if c, ok := cache[name]; ok {
-		//fmt.Println("cache hit", name)
-		return name, *c
+	// unwrap pointer once
+	if t.Kind() == reflect.Ptr {
+		t = t.Elem()
 	}
 
-	p := oas.Schema{
-		Type:     parseType(t),
-		Format:   parseFormat(t),
-		Nullable: nullable,
-		Extensions: oas.SpecificationExtension{
-			"GoType": t,
-		},
-	}
-	cache[name] = &p
-
-	switch kind {
+	switch t.Kind() {
 	case reflect.Struct:
-		properties, required := buildProperty(t)
-		p.Required = required
-		p.Properties = properties
-		name = makeName(t)
+		name := DefaultEncoder.makeName(t)
+		if c, ok := cache.Load(name); ok {
+			return *c.(*oas.Schema)
+		}
+
+		schema = oas.Schema{
+			Type:   DefaultEncoder.dataType(t),
+			Format: DefaultEncoder.format(t),
+			Extensions: oas.SpecificationExtension{
+				"GoType": t,
+				"Name":   name,
+			},
+		}
+		if nullable {
+			schema.Type = schema.Type | jsonschema.NullType
+		}
+		cache.Store(name, &schema)
+
+		properties, required := diveStruct(t)
+		schema.Required = slices.Collect(maps.Keys(required))
+		schema.Properties = properties
 	case reflect.Interface:
-		p.AdditionalProperties = &oas.Or[bool, *oas.ValueOrReferenceOf[oas.Schema]]{
-			X: true,
+		name := DefaultEncoder.makeName(t)
+		if c, ok := cache.LoadOrStore(name, &oas.Schema{
+			Type: jsonschema.AnyType,
+			Extensions: oas.SpecificationExtension{
+				"GoType": t,
+				"Name":   name,
+			},
+		}); ok {
+			return *c.(*oas.Schema)
 		}
 	case reflect.Map:
-		_, item := defineObject(t.Elem(), nullable)
-		p.AdditionalProperties = &oas.Or[bool, *oas.ValueOrReferenceOf[oas.Schema]]{
+		schema = oas.Schema{
+			Type:   DefaultEncoder.dataType(t) | jsonschema.NullType,
+			Format: DefaultEncoder.format(t),
+			Extensions: oas.SpecificationExtension{
+				"GoType": t,
+			},
+		}
+
+		item := objectSchema(t.Elem())
+		schema.AdditionalProperties = &oas.Or[bool, *oas.ValueOrReferenceOf[oas.Schema]]{
 			Y: &oas.ValueOrReferenceOf[oas.Schema]{
 				Value: item,
 			},
 		}
-		name = makeName(t)
 	case reflect.Slice, reflect.Array:
-		// unwrap array or slice
-		_, item := defineObject(t.Elem(), true)
-		p.Items = &oas.ValueOrReferenceOf[oas.Schema]{
+		schema = oas.Schema{
+			Type:   DefaultEncoder.dataType(t) | jsonschema.NullType,
+			Format: DefaultEncoder.format(t),
+			Extensions: oas.SpecificationExtension{
+				"GoType": t,
+			},
+		}
+
+		item := objectSchema(t.Elem())
+		schema.Items = &oas.ValueOrReferenceOf[oas.Schema]{
 			Value: item,
 		}
-		name = makeName(t)
 	default:
+		schema = oas.Schema{
+			Type:   DefaultEncoder.dataType(t),
+			Format: DefaultEncoder.format(t),
+			Extensions: oas.SpecificationExtension{
+				"GoType": t,
+			},
+		}
+		if nullable {
+			schema.Type = schema.Type | jsonschema.NullType
+		}
 	}
-
-	return name, p
+	return
 }
 
 func define(t reflect.Type) map[string]oas.Schema {
 	objMap := make(map[string]oas.Schema)
-	name, obj := defineObject(t, false)
+	obj := objectSchema(t)
+	if !obj.Type.Has(jsonschema.ObjectType) {
+		return objMap
+	}
+	name := obj.Extensions["Name"].(string)
 	objMap[name] = obj
 
 	dirty := true
@@ -227,10 +326,10 @@ func define(t reflect.Type) map[string]oas.Schema {
 					prop = prop.Items.Value
 				}
 				if prop.Properties != nil {
-					if prop.Type == oas.ObjectType {
-						name := makeName(prop.Extensions["GoType"].(reflect.Type))
+					if prop.Type.Has(jsonschema.ObjectType) {
+						name := prop.Extensions["Name"].(string)
 						if _, exists := objMap[name]; !exists {
-							name, child := defineObject(prop.Extensions["GoType"].(reflect.Type), false)
+							child := objectSchema(prop.Extensions["GoType"].(reflect.Type))
 							objMap[name] = child
 							dirty = true
 						}
@@ -246,10 +345,10 @@ func define(t reflect.Type) map[string]oas.Schema {
 					prop = &prop.Items.Value
 				}
 				for prop != nil {
-					if prop.Type == oas.ObjectType {
-						name := makeName(prop.Extensions["GoType"].(reflect.Type))
+					if prop.Type.Has(jsonschema.ObjectType) {
+						name := prop.Extensions["Name"].(string)
 						if _, exists := objMap[name]; !exists {
-							name, child := defineObject(prop.Extensions["GoType"].(reflect.Type), false)
+							child := objectSchema(prop.Extensions["GoType"].(reflect.Type))
 							objMap[name] = child
 							dirty = true
 						}

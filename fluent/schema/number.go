@@ -1,10 +1,13 @@
 package schema
 
-import "github.com/MaiMee1/go-apispec/oas/v3"
+import (
+	"github.com/MaiMee1/go-apispec/oas/jsonschema"
+	"github.com/MaiMee1/go-apispec/oas/v3"
+)
 
 func Number(format oas.Format, opts ...Option) oas.Schema {
 	schema := &oas.Schema{
-		Type:   oas.NumberType,
+		Type:   jsonschema.NumberType,
 		Format: format,
 	}
 	for _, opt := range opts {

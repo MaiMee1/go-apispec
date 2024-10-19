@@ -37,12 +37,6 @@ func WithDefault(value interface{}) Option {
 	})
 }
 
-func WithDeprecated() Option {
-	return optionFunc(func(schema *oas.Schema) {
-		schema.Deprecated = true
-	})
-}
-
 func WithEnum(value ...interface{}) Option {
 	return optionFunc(func(schema *oas.Schema) {
 		schema.Enum = value

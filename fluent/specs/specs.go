@@ -3,8 +3,12 @@ package specs
 import (
 	"encoding/json"
 	"fmt"
+	"reflect"
 	"slices"
+	"strings"
+	"sync"
 
+	"github.com/MaiMee1/go-apispec/oas/jsonschema"
 	"github.com/MaiMee1/go-apispec/oas/v3"
 )
 
@@ -45,7 +49,7 @@ func (api *API) Json() string {
 	return string(b)
 }
 
-func WithSchemaDefinitions(definitions map[string]*oas.Schema) Option {
+func WithSchemaDefinitions(definitions *sync.Map) Option {
 	return optionFunc(func(api *API) {
 		if api.document.Components.Schemas == nil {
 			api.document.Components.Schemas = make(map[string]oas.Schema)
@@ -55,16 +59,56 @@ func WithSchemaDefinitions(definitions map[string]*oas.Schema) Option {
 			if schema.Reference != nil {
 				needed = append(needed, schema)
 			}
+			for schema.Value.Type.Has(jsonschema.ArrayType) {
+				if schema.Value.Items == nil {
+					// should not but may happen
+					break
+				}
+				if schema.Value.Items.Reference == nil {
+					schema = schema.Value.Items
+				}
+			}
+			if schema.Value.Type.Has(jsonschema.ObjectType) {
+				//typ := schema.Value.Extensions["GoType"].(reflect.Type)
+				//name := makeName(typ)
+				//schema.Value.Extensions["Name"] = name
+				//schema.Reference = &oas.Reference{
+				//	Ref: fmt.Sprintf("#/components/schemas/%v", name),
+				//}
+				needed = append(needed, schema)
+			}
 		}
-		for name, schema := range definitions {
-			if slices.ContainsFunc(needed, func(schema *oas.ValueOrReferenceOf[oas.Schema]) bool {
+		definitions.Range(func(key, value interface{}) bool {
+			name, schema := key.(string), value.(*oas.Schema)
+			hasThisName := func(schema *oas.ValueOrReferenceOf[oas.Schema]) bool {
 				if schema.Reference != nil && schema.Reference.Ref == fmt.Sprintf("#/components/schemas/%v", name) {
 					return true
 				}
 				return false
-			}) {
+				//return name == schema.Value.Extensions["Name"]
+			}
+			if slices.ContainsFunc(needed, hasThisName) {
 				api.document.Components.Schemas[name] = *schema
 			}
-		}
+			return true
+		})
 	})
+}
+
+func makeName(t reflect.Type) string {
+	name := t.Name()
+	if name == "" {
+		if t.Kind() == reflect.Interface {
+			name = "any // exclude"
+		} else {
+			name = "ptr" + makeName(t.Elem())
+		}
+	}
+	pkgPath := t.PkgPath()
+	if pkgPath != "." {
+		pkgPath += "."
+	}
+	fullName := pkgPath + name
+	fullName = strings.ReplaceAll(fullName, "/", ".") // updated
+	return strings.ReplaceAll(fullName, "-", "_")
 }

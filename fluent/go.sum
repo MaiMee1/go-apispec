@@ -1,5 +1,5 @@
-github.com/MaiMee1/go-apispec/oas v0.0.0-20241017010848-4394883dffb1 h1:Jxn1+NVqpkWgKDv9qZ1kwa0mv5Y5Bo9xEjNlYXP50kA=
-github.com/MaiMee1/go-apispec/oas v0.0.0-20241017010848-4394883dffb1/go.mod h1:sLORfXgwmcCbDrUP/s+0Fh/0O1GRHUQBqcN5CZQHuOc=
+github.com/MaiMee1/go-apispec/oas v0.0.0-20241019095419-fb1f142d2795 h1:TMULj0mcV0MJXc1N8/FrnFB0v7Unlmd0iot+eYGlWiw=
+github.com/MaiMee1/go-apispec/oas v0.0.0-20241019095419-fb1f142d2795/go.mod h1:sLORfXgwmcCbDrUP/s+0Fh/0O1GRHUQBqcN5CZQHuOc=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/gabriel-vasile/mimetype v1.4.3 h1:in2uUcidCuFcDKtdcBxlR0rJ1+fsokWf+uqxgUFjbI0=
