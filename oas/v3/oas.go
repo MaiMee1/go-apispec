@@ -658,14 +658,10 @@ type Schema struct {
 	Not                  *ValueOrReferenceOf[Schema]            `json:"not,omitempty"`
 	Format               Format                                 `json:"format,omitempty"`
 
-	Nullable      bool                   `json:"nullable,omitempty"`
 	Discriminator *Discriminator         `json:"discriminator,omitempty"`
-	ReadOnly      bool                   `json:"readOnly,omitempty" validate:""`
-	WriteOnly     bool                   `json:"writeOnly,omitempty" `
 	Xml           *XML                   `json:"xml,omitempty"`
 	ExternalDocs  *ExternalDocumentation `json:"externalDocs,omitempty"`
 	Example       interface{}            `json:"example,omitempty"`
-	Deprecated    bool                   `json:"deprecated,omitempty"`
 
 	Extensions SpecificationExtension `json:"-"`
 }
