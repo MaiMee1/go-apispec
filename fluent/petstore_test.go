@@ -2,27 +2,45 @@ package main
 
 import (
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/MaiMee1/go-apispec/fluent/operation"
 	"github.com/MaiMee1/go-apispec/fluent/parameter"
 	"github.com/MaiMee1/go-apispec/fluent/schema"
+	"github.com/MaiMee1/go-apispec/fluent/schema/encoder"
 	"github.com/MaiMee1/go-apispec/fluent/security"
 	"github.com/MaiMee1/go-apispec/fluent/specs"
 	"github.com/MaiMee1/go-apispec/oas/v3"
 )
 
-type Tag struct{}
+type Tag struct {
+	Id   int64  `json:"id,omitempty"`
+	Name string `json:"name,omitempty"`
+}
+type Category struct {
+	Id   int64  `json:"id,omitempty"`
+	Name string `json:"name,omitempty"`
+}
 type Pet struct {
 	Id        int64    `json:"id,omitempty"`
 	Name      string   `json:"name" validate:"required"`
+	Category  Category `json:"category"`
 	PhotoUrls []string `json:"photoUrls" validate:"required"`
 	Tags      []Tag    `json:"tags,omitempty"`
 	Status    string   `json:"status,omitempty"`
 }
-type ApiResponse struct{}
+type ApiResponse struct {
+	Code    int32  `json:"code,omitempty"`
+	Type    string `json:"type,omitempty"`
+	Message string `json:"message,omitempty"`
+}
 
 func TestFluent_PetStore(t *testing.T) {
+	schema.WithEncoder(encoder.WithNameFilter(func(s string) string {
+		return strings.TrimPrefix(s, "github.com.MaiMee1.go_apispec.fluent.")
+	}))
+
 	api, err := specs.New(
 		specs.WithTitle("Swagger Petstore - OpenAPI 3.0"),
 		specs.WithDescription("This is a sample Pet Store Server based on the OpenAPI 3.0 specification.  You can find out more about\nSwagger at [https://swagger.io](https://swagger.io). In the third iteration of the pet store, we've switched to the design first approach!\nYou can now help us improve the API whether it's by making changes to the definition itself or to the code.\nThat way, with time, we can improve the API in general, and expose some of the new features in OAS3.\n\n_If you're looking for the Swagger 2.0/OAS 2.0 version of Petstore, then click [here](https://editor.swagger.io/?url=https://petstore.swagger.io/v2/swagger.yaml). Alternatively, you can load via the `Edit > Load Petstore OAS 2.0` menu option!_\n\nSome useful links:\n- [The Pet Store repository](https://github.com/swagger-api/swagger-petstore)\n- [The source API definition for the Pet Store](https://github.com/swagger-api/swagger-petstore/blob/master/src/main/resources/openapi.yaml)"),
@@ -107,10 +125,7 @@ func TestFluent_PetStore(t *testing.T) {
 			operation.WithDescription("Multiple tags can be provided with comma separated strings. Use tag1, tag2, tag3 for testing."),
 			operation.WithTags("pet"),
 			operation.WithParams(
-				parameter.Query("tags", "Tags to filter by", false, parameter.WithSchemaFor[[]string](
-					schema.WithDefault("available"),
-					schema.WithEnum("available", "pending", "sold"),
-				), parameter.WithFormStyle(true)),
+				parameter.Query("tags", "Tags to filter by", false, parameter.WithSchemaFor[[]string](), parameter.WithFormStyle(true)),
 			),
 			operation.WithResponse(http.StatusOK, "successful operation",
 				"application/json", schema.For[[]Pet](),
@@ -175,6 +190,7 @@ func TestFluent_PetStore(t *testing.T) {
 			operation.WithResponse(http.StatusOK, "successful operation", "application/json", schema.For[map[string]int32]()),
 			operation.WithSecurity(security.Scheme("api_key")),
 		),
+		specs.WithSchemaDefinitions(schema.Cached()),
 	)
 	if err != nil {
 		t.Fatal(err)
