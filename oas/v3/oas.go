@@ -10,11 +10,12 @@ import (
 	"strings"
 
 	"github.com/MaiMee1/go-apispec/oas/iana"
+	"github.com/MaiMee1/go-apispec/oas/jsonschema"
 )
 
 type (
 	SemanticVersion string
-	Type            int8
+	Type            = jsonschema.Type
 	Format          string
 	Location        int8
 	Style           int8
@@ -22,46 +23,34 @@ type (
 )
 
 const (
-	IntegerType Type = iota + 1 // JSON number without a fraction or exponent part
-	NumberType
-	StringType
-	BooleanType
-	ObjectType
-	ArrayType
-)
+	NoFormat Format = ""
 
-func (t Type) String() string {
-	switch t {
-	case IntegerType:
-		return "integer"
-	case NumberType:
-		return "number"
-	case StringType:
-		return "string"
-	case BooleanType:
-		return "boolean"
-	case ObjectType:
-		return "object"
-	case ArrayType:
-		return "array"
-	case 0:
-		return "<0>"
-	default:
-		panic(t)
-	}
-}
+	DateTimeFormat            Format = "date-time"             // as defined by the "date-time" ABNF rule in RFC 3339
+	DateFormat                Format = "date"                  // as defined by the "full-date" ABNF rule in RFC 3339
+	TimeFormat                Format = "time"                  // as defined by the "full-time" ABNF rule in RFC 3339
+	DurationFormat            Format = "duration"              // as defined by the "duration" ABNF rule in RFC 3339
+	EmailFormat               Format = "email"                 // as defined by the "Mailbox" ABNF rule in RFC 5321
+	IdnEmailFormat            Format = "idn-email"             // as defined by the "Mailbox" ABNF rule in RFC 5321 extended by RFC 6531
+	Ipv4Format                Format = "ipv4"                  // as defined by the "dotted-quad" ABNF rule in RFC 2673
+	Ipv6Format                Format = "ipv6"                  // as defined by RFC 4291
+	UriFormat                 Format = "uri"                   // as defined by the "URI" ABNF rule in RFC 3986
+	UriReferenceFormat        Format = "uri-reference"         // as defined by the "URI-reference" ABNF rule in RFC 3986
+	IriFormat                 Format = "iri"                   // as defined by the "IRI" ABNF rule in RFC 3987
+	IriReferenceFormat        Format = "iri-reference"         // as defined by the "IRI-reference" ABNF rule in RFC 3987
+	UuidFormat                Format = "uuid"                  // as defined by the "UUID" ABNF rule in RFC 4122
+	UriTemplateFormat         Format = "uri-template"          // as defined by the "URI-Template" ABNF rule in RFC 6570
+	JsonPointerFormat         Format = "json-pointer"          // as defined by RFC 6901
+	RelativeJsonPointerFormat Format = "relative-json-pointer" // as defined by RFC 6901
+	RegexFormat               Format = "regex"                 // regular expression in the ECMA-262 dialect
 
-const (
-	NoFormat       Format = ""
-	Int32Format    Format = "int32" // signed 32 bits
-	Int64Format    Format = "int64" // signed 64 bits (a.k.a long)
-	FloatFormat    Format = "float"
-	DoubleFormat   Format = "double"
-	Base64Format   Format = "base64" // base64 encoded characters
-	BinaryFormat   Format = "binary" // octet-stream
-	DateFormat     Format = "binary" // As defined by full-date - RFC3339
-	DateTimeFormat Format = "binary" // As defined by date-time - RFC3339
-	PasswordFormat Format = "binary" // A hint to UIs to obscure input.
+	Int32Format  Format = "int32"
+	Int64Format  Format = "int64"
+	FloatFormat  Format = "float"
+	DoubleFormat Format = "double"
+
+	Base64Format   Format = "base64"   // base64 encoded characters
+	BinaryFormat   Format = "binary"   // octet-stream
+	PasswordFormat Format = "password" // A hint to UIs to obscure input.
 )
 
 const (
@@ -150,36 +139,6 @@ func (s Scheme) String() string {
 
 func (v SemanticVersion) Validate() error {
 	// TODO:
-	return nil
-}
-
-func (t Type) MarshalJSON() ([]byte, error) {
-	return json.Marshal(t.String())
-}
-
-//goland:noinspection GoMixedReceiverTypes
-func (t *Type) UnmarshalJSON(b []byte) error {
-	var s string
-	if err := json.Unmarshal(b, &s); err != nil {
-		//panic(fmt.Errorf("%s %v", b, err))
-		return err
-	}
-	switch s {
-	case IntegerType.String():
-		*t = IntegerType
-	case NumberType.String():
-		*t = NumberType
-	case StringType.String():
-		*t = StringType
-	case BooleanType.String():
-		*t = BooleanType
-	case ObjectType.String():
-		*t = ObjectType
-	case ArrayType.String():
-		*t = ArrayType
-	default:
-		return fmt.Errorf("invalid type %q", s)
-	}
 	return nil
 }
 
@@ -692,7 +651,7 @@ type Schema struct {
 	Properties           map[string]ValueOrReferenceOf[Schema]  `json:"properties,omitempty"`
 	AdditionalProperties *Or[bool, *ValueOrReferenceOf[Schema]] `json:"additionalProperties,omitempty"`
 	Enum                 []interface{}                          `json:"enum,omitempty"`
-	Type                 Type                                   `json:"type,omitempty"`
+	Type                 jsonschema.Type                        `json:"type,omitempty"`
 	AllOf                []ValueOrReferenceOf[Schema]           `json:"allOf,omitempty"`
 	AnyOf                []ValueOrReferenceOf[Schema]           `json:"anyOf,omitempty"`
 	OneOf                []ValueOrReferenceOf[Schema]           `json:"oneOf,omitempty"`
@@ -711,14 +670,15 @@ type Schema struct {
 	Extensions SpecificationExtension `json:"-"`
 }
 
-
-// ValidationTag returns a tag style validation to use for a value specified by the Schema.
+// validationTag returns a tag style validation to use for a value specified by the Schema.
 //
+//	tag := validationTag(schema, v)
 //	err := validate.Var(v, tag)
+func validationTag(s Schema, typ Type) string {
 	const sep = ','
 	b := strings.Builder{}
-	switch s.Type {
-	case IntegerType, NumberType:
+	switch typ {
+	case jsonschema.IntegerType, jsonschema.NumberType:
 		if s.MultipleOf != 0 {
 			b.WriteString("multipleOf=")
 			b.WriteString(strconv.Itoa(s.MultipleOf))
@@ -744,7 +704,7 @@ type Schema struct {
 		}
 		if len(s.Enum) > 0 {
 			var format string
-			if s.Type == IntegerType {
+			if typ.Has(jsonschema.IntegerType) {
 				format = "%d"
 			} else {
 				format = "%f"
@@ -757,7 +717,7 @@ type Schema struct {
 			b.WriteRune(sep)
 		}
 		return b.String()
-	case StringType:
+	case jsonschema.StringType:
 		if s.MaxLength != 0 {
 			b.WriteString("max=")
 			b.WriteString(strconv.Itoa(s.MaxLength))
@@ -782,7 +742,7 @@ type Schema struct {
 			b.WriteRune(sep)
 		}
 		return b.String()
-	case BooleanType:
+	case jsonschema.BooleanType:
 		if len(s.Enum) > 0 {
 			b.WriteString("one of=")
 			for _, e := range s.Enum {
@@ -792,9 +752,9 @@ type Schema struct {
 			b.WriteRune(sep)
 		}
 		return ""
-	case ObjectType:
+	case jsonschema.ObjectType:
 		return ""
-	case ArrayType:
+	case jsonschema.ArrayType:
 		if s.MaxItems != 0 {
 			b.WriteString("max=")
 			b.WriteString(strconv.Itoa(s.MaxItems))
