@@ -711,24 +711,10 @@ type Schema struct {
 	Extensions SpecificationExtension `json:"-"`
 }
 
-func (s Schema) Validate() error {
-	switch s.Type {
-	case IntegerType, NumberType, StringType, BooleanType:
-		return validate.Var(s, s.ValidationTag())
-	case ObjectType:
-		return nil
-	case ArrayType:
-		return nil
-	default:
-		panic(fmt.Errorf("invalid type %s", s.Type))
-	}
-}
 
 // ValidationTag returns a tag style validation to use for a value specified by the Schema.
 //
-//	tag := schema.ValidationTag()
 //	err := validate.Var(v, tag)
-func (s Schema) ValidationTag() string {
 	const sep = ','
 	b := strings.Builder{}
 	switch s.Type {
