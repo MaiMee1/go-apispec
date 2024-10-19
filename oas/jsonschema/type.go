@@ -55,7 +55,7 @@ func (t Type) Range() iter.Seq[Type] {
 	return func(yield func(Type) bool) {
 		for typ := range maps.Keys(typeToString) {
 			if t&typ == typ {
-				if !yield(t) {
+				if !yield(typ) {
 					return
 				}
 			}
