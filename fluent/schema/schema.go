@@ -3,14 +3,20 @@ package schema
 import (
 	"fmt"
 	"reflect"
-	"sync"
 
+	"github.com/MaiMee1/go-apispec/fluent/schema/encoder"
 	"github.com/MaiMee1/go-apispec/oas/jsonschema"
 	"github.com/MaiMee1/go-apispec/oas/v3"
 )
 
+var enc = encoder.New()
+
+func WithEncoder(opts ...encoder.Option) {
+	enc = encoder.New(opts...)
+}
+
 func New(typ reflect.Type, opts ...Option) oas.Schema {
-	schema := objectSchema(typ)
+	schema := enc.Encode(typ)
 	for _, opt := range opts {
 		opt.apply(&schema)
 	}
@@ -24,7 +30,7 @@ func For[T any](opts ...Option) oas.Schema {
 
 func RefFor[T any](opts ...Option) oas.Reference {
 	typ := reflect.TypeFor[T]()
-	schema := objectSchema(typ)
+	schema := enc.Encode(typ)
 	for _, opt := range opts {
 		opt.apply(&schema)
 	}
@@ -37,6 +43,6 @@ func RefFor[T any](opts ...Option) oas.Reference {
 	panic(fmt.Errorf("%v should be convertable to an object", typ))
 }
 
-func Cached() *sync.Map {
-	return &cache
+func Cached() map[string]*oas.Schema {
+	return enc.Cache()
 }

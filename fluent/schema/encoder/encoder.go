@@ -1,4 +1,4 @@
-package schema
+package encoder
 
 import (
 	"maps"
@@ -74,30 +74,41 @@ func dataType2(t reflect.Type) oas.Type {
 func name2(t reflect.Type) string {
 	name := t.Name()
 	if name == "" {
-		switch t.Kind() {
-		case reflect.Interface:
-			name = "any"
-		case reflect.Pointer:
-			name = "ptr"
-		default:
-			panic(t)
-		}
+		panic(t)
 	}
-	return t.PkgPath() + name
+	return t.PkgPath() + "." + name
 }
 
-type StringFilter = func(string) string
-
-var DefaultEncoder = Encoder{
-	nameFilter: func(qualifiedName string) string {
-		qualifiedName = strings.ReplaceAll(qualifiedName, "/", ".")
-		qualifiedName = strings.ReplaceAll(qualifiedName, "-", "_")
-		return qualifiedName
-	},
-}
+var defaultNameFilter = strings.NewReplacer("/", ".", "-", "_").Replace
 
 type Encoder struct {
-	nameFilter StringFilter
+	cache         sync.Map // map[string]*oas.Schema
+	nameFilter    StringFilter
+	nullableMap   bool
+	nullableSlice bool
+}
+
+func New(opts ...Option) *Encoder {
+	enc := new(Encoder)
+	enc.cache = sync.Map{}
+	enc.nameFilter = defaultNameFilter
+	for _, opt := range opts {
+		opt.apply(enc)
+	}
+	return enc
+}
+
+func (enc *Encoder) Encode(t reflect.Type) oas.Schema {
+	return enc.objectSchema(t)
+}
+
+func (enc *Encoder) Cache() map[string]*oas.Schema {
+	m := make(map[string]*oas.Schema)
+	enc.cache.Range(func(k, v interface{}) bool {
+		m[k.(string)] = v.(*oas.Schema)
+		return true
+	})
+	return m
 }
 
 func (enc *Encoder) format(t reflect.Type) oas.Format {
@@ -124,7 +135,7 @@ func isRequired(sf reflect.StructField) bool {
 	return slices.Contains(tags, "required")
 }
 
-func diveStruct(t reflect.Type) (properties map[string]oas.ValueOrReferenceOf[oas.Schema], required map[string]struct{}) {
+func (enc *Encoder) diveStruct(t reflect.Type) (properties map[string]oas.ValueOrReferenceOf[oas.Schema], required map[string]struct{}) {
 	required = make(map[string]struct{})
 	properties = make(map[string]oas.ValueOrReferenceOf[oas.Schema])
 	for i := 0; i < t.NumField(); i++ {
@@ -141,7 +152,7 @@ func diveStruct(t reflect.Type) (properties map[string]oas.ValueOrReferenceOf[oa
 				continue
 			}
 			// dive into embedded fields of un/exported struct types
-			props, req := diveStruct(t)
+			props, req := enc.diveStruct(t)
 			for name, prop := range props {
 				if _, ok := properties[name]; ok {
 					panic("promoted fields in conflict")
@@ -191,10 +202,10 @@ func diveStruct(t reflect.Type) (properties map[string]oas.ValueOrReferenceOf[oa
 				schema.Type = jsonschema.StringType
 				schema.Format = format2(sf.Type, true)
 			default:
-				schema = objectSchema(sf.Type)
+				schema = enc.objectSchema(sf.Type)
 			}
 		} else {
-			schema = objectSchema(sf.Type)
+			schema = enc.objectSchema(sf.Type)
 		}
 
 		if isRequired(sf) {
@@ -208,20 +219,19 @@ func diveStruct(t reflect.Type) (properties map[string]oas.ValueOrReferenceOf[oa
 			Value: schema,
 		}
 	}
-
 	return
 }
 
-var cache = sync.Map{} // map[string]*oas.Schema
-
-func objectSchema(t reflect.Type) (schema oas.Schema) {
+func (enc *Encoder) objectSchema(t reflect.Type) (schema oas.Schema) {
 	var nullable bool
 	// some types allow nil values
 	switch t.Kind() {
-	case reflect.Pointer,
-		reflect.Interface, reflect.Map,
-		reflect.Array, reflect.Slice:
+	case reflect.Pointer:
 		nullable = true
+	case reflect.Map:
+		nullable = enc.nullableMap
+	case reflect.Array, reflect.Slice:
+		nullable = enc.nullableSlice
 	default:
 	}
 
@@ -230,137 +240,44 @@ func objectSchema(t reflect.Type) (schema oas.Schema) {
 		t = t.Elem()
 	}
 
+	schema = oas.Schema{
+		Type:   enc.dataType(t),
+		Format: enc.format(t),
+		Extensions: oas.SpecificationExtension{
+			"GoType": t,
+		},
+	}
 	switch t.Kind() {
 	case reflect.Struct:
-		name := DefaultEncoder.makeName(t)
-		if c, ok := cache.Load(name); ok {
+		name := enc.makeName(t)
+		if c, ok := enc.cache.Load(name); ok {
 			return *c.(*oas.Schema)
 		}
 
-		schema = oas.Schema{
-			Type:   DefaultEncoder.dataType(t),
-			Format: DefaultEncoder.format(t),
-			Extensions: oas.SpecificationExtension{
-				"GoType": t,
-				"Name":   name,
-			},
-		}
-		if nullable {
-			schema.Type = schema.Type | jsonschema.NullType
-		}
-		cache.Store(name, &schema)
+		schema.Extensions["Name"] = name
+		enc.cache.Store(name, &schema)
 
-		properties, required := diveStruct(t)
+		properties, required := enc.diveStruct(t)
 		schema.Required = slices.Collect(maps.Keys(required))
 		schema.Properties = properties
 	case reflect.Interface:
-		name := DefaultEncoder.makeName(t)
-		if c, ok := cache.LoadOrStore(name, &oas.Schema{
-			Type: jsonschema.AnyType,
-			Extensions: oas.SpecificationExtension{
-				"GoType": t,
-				"Name":   name,
-			},
-		}); ok {
-			return *c.(*oas.Schema)
-		}
+		schema.Type = jsonschema.AnyType
 	case reflect.Map:
-		schema = oas.Schema{
-			Type:   DefaultEncoder.dataType(t) | jsonschema.NullType,
-			Format: DefaultEncoder.format(t),
-			Extensions: oas.SpecificationExtension{
-				"GoType": t,
-			},
-		}
-
-		item := objectSchema(t.Elem())
+		item := enc.objectSchema(t.Elem())
 		schema.AdditionalProperties = &oas.Or[bool, *oas.ValueOrReferenceOf[oas.Schema]]{
 			Y: &oas.ValueOrReferenceOf[oas.Schema]{
 				Value: item,
 			},
 		}
 	case reflect.Slice, reflect.Array:
-		schema = oas.Schema{
-			Type:   DefaultEncoder.dataType(t) | jsonschema.NullType,
-			Format: DefaultEncoder.format(t),
-			Extensions: oas.SpecificationExtension{
-				"GoType": t,
-			},
-		}
-
-		item := objectSchema(t.Elem())
+		item := enc.objectSchema(t.Elem())
 		schema.Items = &oas.ValueOrReferenceOf[oas.Schema]{
 			Value: item,
 		}
 	default:
-		schema = oas.Schema{
-			Type:   DefaultEncoder.dataType(t),
-			Format: DefaultEncoder.format(t),
-			Extensions: oas.SpecificationExtension{
-				"GoType": t,
-			},
-		}
-		if nullable {
-			schema.Type = schema.Type | jsonschema.NullType
-		}
+	}
+	if nullable {
+		schema.Type = schema.Type | jsonschema.NullType
 	}
 	return
-}
-
-func define(t reflect.Type) map[string]oas.Schema {
-	objMap := make(map[string]oas.Schema)
-	obj := objectSchema(t)
-	if !obj.Type.Has(jsonschema.ObjectType) {
-		return objMap
-	}
-	name := obj.Extensions["Name"].(string)
-	objMap[name] = obj
-
-	dirty := true
-	for dirty {
-		dirty = false
-		for _, d := range objMap {
-			if d.Items != nil { // update
-				prop := d.Items.Value
-				for prop.Items != nil {
-					prop = prop.Items.Value
-				}
-				if prop.Properties != nil {
-					if prop.Type.Has(jsonschema.ObjectType) {
-						name := prop.Extensions["Name"].(string)
-						if _, exists := objMap[name]; !exists {
-							child := objectSchema(prop.Extensions["GoType"].(reflect.Type))
-							objMap[name] = child
-							dirty = true
-						}
-					}
-					if prop.AdditionalProperties != nil && prop.AdditionalProperties.Y != nil {
-						prop = prop.AdditionalProperties.Y.Value
-					}
-				}
-			}
-			for _, p := range d.Properties {
-				prop := &p.Value
-				for prop.Items != nil { // update
-					prop = &prop.Items.Value
-				}
-				for prop != nil {
-					if prop.Type.Has(jsonschema.ObjectType) {
-						name := prop.Extensions["Name"].(string)
-						if _, exists := objMap[name]; !exists {
-							child := objectSchema(prop.Extensions["GoType"].(reflect.Type))
-							objMap[name] = child
-							dirty = true
-						}
-					}
-					if prop.AdditionalProperties != nil && prop.AdditionalProperties.Y != nil {
-						prop = &prop.AdditionalProperties.Y.Value
-					} else {
-						prop = nil
-					}
-				}
-			}
-		}
-	}
-	return objMap
 }
