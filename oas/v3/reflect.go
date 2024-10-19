@@ -30,23 +30,31 @@ func iterValueOrReference(v reflect.Value, makeCanSet bool) iter.Seq[reflect.Val
 		case reflect.Ptr:
 			if !v.IsNil() {
 				for f := range iterValueOrReference(v.Elem(), makeCanSet) {
-					yield(f)
+					if !yield(f) {
+						return
+					}
 				}
 			}
 		case reflect.Struct:
 			for i := 0; i < v.NumField(); i++ {
 				for f := range iterValueOrReference(v.Field(i), makeCanSet) {
-					yield(f)
+					if !yield(f) {
+						return
+					}
 				}
 			}
 			if strings.HasPrefix(v.Type().Name(), valueOrReferenceOfPrefix) {
 				//fmt.Println(">>>", v.Type())
-				yield(v)
+				if !yield(v) {
+					return
+				}
 			}
 		case reflect.Slice, reflect.Array:
 			for i := 0; i < v.Len(); i++ {
 				for f := range iterValueOrReference(v.Index(i).Addr(), makeCanSet) {
-					yield(f)
+					if !yield(f) {
+						return
+					}
 				}
 			}
 		case reflect.Map:
@@ -57,12 +65,16 @@ func iterValueOrReference(v reflect.Value, makeCanSet bool) iter.Seq[reflect.Val
 					p := reflect.New(value.Type())
 					p.Elem().Set(value)
 					for f := range iterValueOrReference(p, makeCanSet) {
-						yield(f)
+						if !yield(f) {
+							return
+						}
 					}
 					v.SetMapIndex(it.Key(), p.Elem())
 				} else {
 					for f := range iterValueOrReference(value, makeCanSet) {
-						yield(f)
+						if !yield(f) {
+							return
+						}
 					}
 				}
 			}
@@ -77,7 +89,9 @@ func (doc *OpenAPI) IterRef() iter.Seq[*Reference] {
 		for v := range iterValueOrReference(v, false) {
 			ref := v.FieldByName("Reference").Interface().(*Reference)
 			if ref != nil {
-				yield(ref)
+				if !yield(ref) {
+					return
+				}
 			}
 		}
 	}
@@ -90,7 +104,9 @@ func (doc *OpenAPI) IterSchemaOrRef() iter.Seq[*ValueOrReferenceOf[Schema]] {
 				p := reflect.New(v.Type())
 				p.Elem().Set(v)
 				if or, ok := p.Interface().(*ValueOrReferenceOf[Schema]); ok {
-					yield(or)
+					if !yield(or) {
+						return
+					}
 				}
 				v.Set(p.Elem())
 			}
@@ -100,7 +116,9 @@ func (doc *OpenAPI) IterSchemaOrRef() iter.Seq[*ValueOrReferenceOf[Schema]] {
 				p := reflect.New(v.Type())
 				p.Elem().Set(v)
 				if or, ok := p.Interface().(*ValueOrReferenceOf[Schema]); ok {
-					yield(or)
+					if !yield(or) {
+						return
+					}
 				}
 				v.Set(p.Elem())
 			}
