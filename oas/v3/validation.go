@@ -5,13 +5,12 @@ import (
 	"net/url"
 	"reflect"
 
+	"github.com/MaiMee1/go-apispec/oas/internal/validate"
 	"github.com/go-playground/validator/v10"
 )
 
-var validate = validator.New(validator.WithRequiredStructEnabled())
-
 func init() {
-	err := validate.RegisterValidation("url_fragment", func(fl validator.FieldLevel) bool {
+	err := validate.Inst.RegisterValidation("url_fragment", func(fl validator.FieldLevel) bool {
 		v := fl.Field()
 		if v.Kind() != reflect.String {
 			return true // skip

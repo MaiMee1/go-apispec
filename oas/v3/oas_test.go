@@ -1,16 +1,38 @@
-package oas_test
+package oas
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
+	"os"
+	"reflect"
 	"testing"
 
-	"github.com/MaiMee1/go-apispec/oas/v3"
+	"github.com/MaiMee1/go-apispec/oas/internal/validate"
 )
 
 func TestOpenAPI_UnmarshalJSON(t *testing.T) {
-	document, err := oas.New("testdata/petstore.json")
+	ctx := context.TODO()
+
+	file, err := os.ReadFile("testdata/petstore.json")
 	if err != nil {
+		t.Fatal(err)
+	}
+
+	var root interface{}
+	if err := json.Unmarshal(file, &root); err != nil {
+		t.Fatal(err)
+	}
+	ctx = context.WithValue(ctx, "Root", root)
+
+	var document OpenAPI
+	if err = json.Unmarshal(file, &document); err != nil {
+		t.Fatal(err)
+	}
+	v := reflect.ValueOf(&document)
+	setRoot(v, root)
+
+	if err := validate.Inst.Struct(document); err != nil {
 		t.Error(err)
 	}
 
@@ -18,7 +40,7 @@ func TestOpenAPI_UnmarshalJSON(t *testing.T) {
 		t.Error(document.Version)
 	}
 	for k, m := range document.Paths["/pet"].Put.RequestBody.Value.Content {
-		b, err := json.Marshal(m.Schema.Resolve())
+		b, err := json.Marshal(m.Schema.Resolve(ctx))
 		if err != nil {
 			t.Error(err)
 		}
@@ -29,7 +51,7 @@ func TestOpenAPI_UnmarshalJSON(t *testing.T) {
 
 func FuzzOpenAPI(f *testing.F) {
 	f.Fuzz(func(t *testing.T, s string) {
-		var document oas.OpenAPI
+		var document OpenAPI
 		err := json.Unmarshal([]byte(fmt.Sprintf(`{"openapi":"%s"}`, s)), &document)
 		if err != nil {
 			t.Fatal(err)

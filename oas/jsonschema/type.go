@@ -5,7 +5,10 @@ import (
 	"fmt"
 	"iter"
 	"maps"
+	"reflect"
 	"strings"
+
+	"github.com/MaiMee1/go-apispec/oas/internal/flag"
 )
 
 type Type uint8
@@ -22,6 +25,40 @@ const (
 
 const AnyType = NullType | IntegerType | NumberType | StringType | BooleanType | ObjectType | ArrayType
 
+var kindToType = []Type{
+	reflect.Invalid:       0,
+	reflect.Bool:          BooleanType,
+	reflect.Int:           IntegerType,
+	reflect.Int8:          IntegerType,
+	reflect.Int16:         IntegerType,
+	reflect.Int32:         IntegerType,
+	reflect.Int64:         IntegerType,
+	reflect.Uint:          IntegerType,
+	reflect.Uint8:         IntegerType,
+	reflect.Uint16:        IntegerType,
+	reflect.Uint32:        IntegerType,
+	reflect.Uint64:        IntegerType,
+	reflect.Uintptr:       IntegerType,
+	reflect.Float32:       NumberType,
+	reflect.Float64:       NumberType,
+	reflect.Complex64:     0,
+	reflect.Complex128:    0,
+	reflect.Array:         ArrayType,
+	reflect.Chan:          0,
+	reflect.Func:          0,
+	reflect.Interface:     AnyType,
+	reflect.Map:           ObjectType,
+	reflect.Pointer:       0,
+	reflect.Slice:         ArrayType,
+	reflect.String:        StringType,
+	reflect.Struct:        ObjectType,
+	reflect.UnsafePointer: 0,
+}
+
+func TypeOf(v any) Type {
+	return kindToType[reflect.TypeOf(v).Kind()]
+}
+
 var typeToString = map[Type]string{
 	NullType:    "null",
 	IntegerType: "integer",
@@ -35,32 +72,12 @@ var stringToType map[string]Type
 
 //goland:noinspection GoMixedReceiverTypes
 func (t Type) Has(ands ...Type) bool {
-	for _, and := range ands {
-		var ok = false
-		for or := range and.Range() {
-			if t&or == or {
-				ok = true
-				break
-			}
-		}
-		if !ok {
-			return false
-		}
-	}
-	return true
+	return flag.Has(t, maps.Keys(typeToString), ands...)
 }
 
 //goland:noinspection GoMixedReceiverTypes
 func (t Type) Range() iter.Seq[Type] {
-	return func(yield func(Type) bool) {
-		for typ := range maps.Keys(typeToString) {
-			if t&typ == typ {
-				if !yield(typ) {
-					return
-				}
-			}
-		}
-	}
+	return flag.Range(t, maps.Keys(typeToString))
 }
 
 //goland:noinspection GoMixedReceiverTypes

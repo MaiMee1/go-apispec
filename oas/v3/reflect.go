@@ -4,10 +4,12 @@ import (
 	"iter"
 	"reflect"
 	"strings"
+
+	"github.com/MaiMee1/go-apispec/oas/jsonschema/oas31"
 )
 
 var valueOrReferenceOfPrefix = strings.TrimSuffix(reflect.TypeOf(ValueOrReferenceOf[bool]{}).Name(), "[bool]")
-var valueOrReferenceOfSchema = reflect.TypeOf(ValueOrReferenceOf[Schema]{}).Name()
+var valueOrReferenceOfSchema = reflect.TypeOf(oas31.Schema{}).Name()
 
 // setRoot recursively find ValueOrReferenceOf fields or elements and sets its Root to root.
 func setRoot(v reflect.Value, root interface{}) {
@@ -97,13 +99,13 @@ func (doc *OpenAPI) IterRef() iter.Seq[*Reference] {
 	}
 }
 
-func (doc *OpenAPI) IterSchemaOrRef() iter.Seq[*ValueOrReferenceOf[Schema]] {
-	return func(yield func(*ValueOrReferenceOf[Schema]) bool) {
+func (doc *OpenAPI) IterSchemaOrRef() iter.Seq[*oas31.Schema] {
+	return func(yield func(*oas31.Schema) bool) {
 		for v := range iterValueOrReference(reflect.ValueOf(doc.Paths), true) {
 			if v.Type().Name() == valueOrReferenceOfSchema {
 				p := reflect.New(v.Type())
 				p.Elem().Set(v)
-				if or, ok := p.Interface().(*ValueOrReferenceOf[Schema]); ok {
+				if or, ok := p.Interface().(*oas31.Schema); ok {
 					if !yield(or) {
 						return
 					}
@@ -115,7 +117,7 @@ func (doc *OpenAPI) IterSchemaOrRef() iter.Seq[*ValueOrReferenceOf[Schema]] {
 			if v.Type().Name() == valueOrReferenceOfSchema {
 				p := reflect.New(v.Type())
 				p.Elem().Set(v)
-				if or, ok := p.Interface().(*ValueOrReferenceOf[Schema]); ok {
+				if or, ok := p.Interface().(*oas31.Schema); ok {
 					if !yield(or) {
 						return
 					}

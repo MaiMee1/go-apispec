@@ -6,43 +6,25 @@ import (
 	"maps"
 	"reflect"
 	"regexp"
-	"strconv"
+	"slices"
 	"strings"
 
 	"github.com/MaiMee1/go-apispec/oas/iana"
+	"github.com/MaiMee1/go-apispec/oas/internal/validate"
 	"github.com/MaiMee1/go-apispec/oas/jsonschema"
+	"github.com/MaiMee1/go-apispec/oas/jsonschema/oas31"
 )
 
 type (
 	SemanticVersion string
 	Type            = jsonschema.Type
-	Format          string
+	Format          = jsonschema.Format
 	Location        int8
 	Style           int8
 	Scheme          int8
 )
 
 const (
-	NoFormat Format = ""
-
-	DateTimeFormat            Format = "date-time"             // as defined by the "date-time" ABNF rule in RFC 3339
-	DateFormat                Format = "date"                  // as defined by the "full-date" ABNF rule in RFC 3339
-	TimeFormat                Format = "time"                  // as defined by the "full-time" ABNF rule in RFC 3339
-	DurationFormat            Format = "duration"              // as defined by the "duration" ABNF rule in RFC 3339
-	EmailFormat               Format = "email"                 // as defined by the "Mailbox" ABNF rule in RFC 5321
-	IdnEmailFormat            Format = "idn-email"             // as defined by the "Mailbox" ABNF rule in RFC 5321 extended by RFC 6531
-	Ipv4Format                Format = "ipv4"                  // as defined by the "dotted-quad" ABNF rule in RFC 2673
-	Ipv6Format                Format = "ipv6"                  // as defined by RFC 4291
-	UriFormat                 Format = "uri"                   // as defined by the "URI" ABNF rule in RFC 3986
-	UriReferenceFormat        Format = "uri-reference"         // as defined by the "URI-reference" ABNF rule in RFC 3986
-	IriFormat                 Format = "iri"                   // as defined by the "IRI" ABNF rule in RFC 3987
-	IriReferenceFormat        Format = "iri-reference"         // as defined by the "IRI-reference" ABNF rule in RFC 3987
-	UuidFormat                Format = "uuid"                  // as defined by the "UUID" ABNF rule in RFC 4122
-	UriTemplateFormat         Format = "uri-template"          // as defined by the "URI-Template" ABNF rule in RFC 6570
-	JsonPointerFormat         Format = "json-pointer"          // as defined by RFC 6901
-	RelativeJsonPointerFormat Format = "relative-json-pointer" // as defined by RFC 6901
-	RegexFormat               Format = "regex"                 // regular expression in the ECMA-262 dialect
-
 	Int32Format  Format = "int32"
 	Int64Format  Format = "int64"
 	FloatFormat  Format = "float"
@@ -60,21 +42,16 @@ const (
 	CookieLocation
 )
 
+var locationToString = []string{
+	0:              "<0>",
+	QueryLocation:  "query",
+	HeaderLocation: "header",
+	PathLocation:   "path",
+	CookieLocation: "cookie",
+}
+
 func (l Location) String() string {
-	switch l {
-	case QueryLocation:
-		return "query"
-	case HeaderLocation:
-		return "header"
-	case PathLocation:
-		return "path"
-	case CookieLocation:
-		return "cookie"
-	case 0:
-		return "<0>"
-	default:
-		panic(l)
-	}
+	return locationToString[l]
 }
 
 const (
@@ -87,27 +64,19 @@ const (
 	DeepObjectStyle
 )
 
+var styleToString = []string{
+	0:                   "<0>",
+	MatrixStyle:         "matrix",
+	LabelStyle:          "label",
+	FormStyle:           "form",
+	SimpleStyle:         "simple",
+	SpaceDelimitedStyle: "spaceDelimited",
+	PipeDelimitedStyle:  "pipeDelimited",
+	DeepObjectStyle:     "deepObject",
+}
+
 func (s Style) String() string {
-	switch s {
-	case MatrixStyle:
-		return "matrix"
-	case LabelStyle:
-		return "label"
-	case FormStyle:
-		return "form"
-	case SimpleStyle:
-		return "simple"
-	case SpaceDelimitedStyle:
-		return "spaceDelimited"
-	case PipeDelimitedStyle:
-		return "pipeDelimited"
-	case DeepObjectStyle:
-		return "deepObject"
-	case 0:
-		return "<0>"
-	default:
-		panic(s)
-	}
+	return styleToString[s]
 }
 
 const (
@@ -118,31 +87,21 @@ const (
 	OpenIdConnectScheme
 )
 
+var schemeToString = []string{
+	0:                   "<0>",
+	ApiKeyScheme:        "apiKey",
+	HttpScheme:          "http",
+	MutualTLSScheme:     "mutualTLS",
+	OAuth2Scheme:        "oauth2",
+	OpenIdConnectScheme: "openIdConnect",
+}
+
 func (s Scheme) String() string {
-	switch s {
-	case ApiKeyScheme:
-		return "apiKey"
-	case HttpScheme:
-		return "http"
-	case MutualTLSScheme:
-		return "mutualTLS"
-	case OAuth2Scheme:
-		return "oauth2"
-	case OpenIdConnectScheme:
-		return "openIdConnect"
-	case 0:
-		return "<0>"
-	default:
-		panic(s)
-	}
+	return schemeToString[s]
 }
 
 func (v SemanticVersion) Validate() error {
 	// TODO:
-	return nil
-}
-
-func (f Format) Validate() error {
 	return nil
 }
 
@@ -156,19 +115,12 @@ func (l *Location) UnmarshalJSON(b []byte) error {
 	if err := json.Unmarshal(b, &s); err != nil {
 		return err
 	}
-	switch s {
-	case QueryLocation.String():
-		*l = QueryLocation
-	case HeaderLocation.String():
-		*l = HeaderLocation
-	case PathLocation.String():
-		*l = PathLocation
-	case CookieLocation.String():
-		*l = CookieLocation
-	default:
-		return fmt.Errorf("invalid location %q", s)
+
+	if i := slices.Index(locationToString, s); i != -1 {
+		*l = Location(i)
+		return nil
 	}
-	return nil
+	return fmt.Errorf("invalid location %q", s)
 }
 
 func (s Style) MarshalJSON() ([]byte, error) {
@@ -181,25 +133,12 @@ func (s *Style) UnmarshalJSON(b []byte) error {
 	if err := json.Unmarshal(b, &st); err != nil {
 		return err
 	}
-	switch st {
-	case MatrixStyle.String():
-		*s = MatrixStyle
-	case LabelStyle.String():
-		*s = LabelStyle
-	case FormStyle.String():
-		*s = FormStyle
-	case SimpleStyle.String():
-		*s = SimpleStyle
-	case SpaceDelimitedStyle.String():
-		*s = SpaceDelimitedStyle
-	case PipeDelimitedStyle.String():
-		*s = PipeDelimitedStyle
-	case DeepObjectStyle.String():
-		*s = DeepObjectStyle
-	default:
-		return fmt.Errorf("invalid style %q", st)
+
+	if i := slices.Index(styleToString, st); i != -1 {
+		*s = Style(i)
+		return nil
 	}
-	return nil
+	return fmt.Errorf("invalid style %q", st)
 }
 
 func (s Scheme) MarshalJSON() ([]byte, error) {
@@ -212,60 +151,15 @@ func (s *Scheme) UnmarshalJSON(b []byte) error {
 	if err := json.Unmarshal(b, &st); err != nil {
 		return err
 	}
-	switch st {
-	case ApiKeyScheme.String():
-		*s = ApiKeyScheme
-	case HttpScheme.String():
-		*s = HttpScheme
-	case MutualTLSScheme.String():
-		*s = MutualTLSScheme
-	case OAuth2Scheme.String():
-		*s = OAuth2Scheme
-	case OpenIdConnectScheme.String():
-		*s = OpenIdConnectScheme
-	default:
-		return fmt.Errorf("invalid scheme %q", st)
+
+	if i := slices.Index(schemeToString, st); i != -1 {
+		*s = Scheme(i)
+		return nil
 	}
-	return nil
+	return fmt.Errorf("invalid scheme %q", st)
 }
 
 type RuntimeExpression string
-
-type Or[A, B comparable] struct {
-	X A
-	Y B
-}
-
-//goland:noinspection GoMixedReceiverTypes
-func (o *Or[A, B]) UnmarshalJSON(b []byte) error {
-	var (
-		x A
-		y B
-	)
-	err1 := json.Unmarshal(b, &x)
-	if err1 == nil {
-		o.X = x
-	}
-
-	err2 := json.Unmarshal(b, &y)
-	if err2 == nil {
-		o.Y = y
-	}
-
-	if err2 == nil || err1 == nil {
-		return nil
-	}
-	return fmt.Errorf("or[%T, %T]: %w: %w", x, y, err2, err1)
-}
-
-//goland:noinspection GoMixedReceiverTypes
-func (o Or[A, B]) MarshalJSON() ([]byte, error) {
-	var x A
-	if o.X != x {
-		return json.Marshal(o.X)
-	}
-	return json.Marshal(o.Y)
-}
 
 type ValueOrReferenceOf[T any] struct {
 	Value     T
@@ -351,12 +245,12 @@ type OpenAPI struct {
 	Components   Components                              `json:"components"`
 	Security     []SecurityRequirement                   `json:"security,omitempty" validate:"dive"`
 	Tags         []Tag                                   `json:"tags,omitempty" validate:"dive"`
-	ExternalDocs *ExternalDocumentation                  `json:"externalDocs,omitempty"`
+	ExternalDocs *oas31.ExternalDocumentation            `json:"externalDocs,omitempty"`
 	Extensions   SpecificationExtension                  `json:"-"`
 }
 
 func (doc *OpenAPI) Validate() error {
-	return validate.Struct(doc)
+	return validate.Inst.Struct(doc)
 }
 
 // Info provides metadata about the API. The metadata MAY be used by the clients if needed, and MAY be presented in editing or documentation generation tools for convenience.
@@ -398,7 +292,7 @@ type ServerVariable struct {
 }
 
 type Components struct {
-	Schemas         map[string]Schema         `json:"schemas,omitempty" validate:"dive"`
+	Schemas         map[string]oas31.Schema   `json:"schemas,omitempty" validate:"dive"`
 	Responses       map[string]Response       `json:"responses,omitempty" validate:"dive"`
 	Parameters      map[string]Parameter      `json:"parameters,omitempty" validate:"dive"`
 	Examples        map[string]Example        `json:"examples,omitempty" validate:"dive"`
@@ -469,7 +363,7 @@ type Operation struct {
 	Tags         []string                                `json:"tags,omitempty"`
 	Summary      string                                  `json:"summary"`
 	Description  RichText                                `json:"description"`
-	ExternalDocs *ExternalDocumentation                  `json:"externalDocs,omitempty"`
+	ExternalDocs *oas31.ExternalDocumentation            `json:"externalDocs,omitempty"`
 	OperationId  string                                  `json:"operationId,omitempty"`
 	Parameters   []ValueOrReferenceOf[Parameter]         `json:"parameters,omitempty" validate:"dive"`
 	RequestBody  *ValueOrReferenceOf[RequestBody]        `json:"requestBody,omitempty"`
@@ -479,12 +373,6 @@ type Operation struct {
 	Security     []SecurityRequirement                   `json:"security,omitempty" validate:"dive"`
 	Servers      []Server                                `json:"servers,omitempty" validate:"dive"`
 	Extensions   SpecificationExtension                  `json:"-"`
-}
-
-type ExternalDocumentation struct {
-	Description RichText               `json:"description"`
-	Url         string                 `json:"url" validate:"required,url"`
-	Extensions  SpecificationExtension `json:"-"`
 }
 
 type Parameter struct {
@@ -497,7 +385,7 @@ type Parameter struct {
 	Style           Style                                  `json:"style,omitempty"`
 	Explode         *bool                                  `json:"explode,omitempty"`
 	AllowReserved   bool                                   `json:"allowReserved,omitempty"`
-	Schema          *ValueOrReferenceOf[Schema]            `json:"schema,omitempty" validate:"required_without=Content"`
+	Schema          *oas31.Schema                          `json:"schema,omitempty" validate:"required_without=Content"`
 	Content         map[string]MediaType                   `json:"content,omitempty" validate:"required_without=Schema"`
 	Example         interface{}                            `json:"example,omitempty"`
 	Examples        map[string]ValueOrReferenceOf[Example] `json:"examples,omitempty"`
@@ -512,7 +400,7 @@ type RequestBody struct {
 }
 
 type MediaType struct {
-	Schema     ValueOrReferenceOf[Schema]             `json:"schema,omitempty"`
+	Schema     *oas31.Schema                          `json:"schema,omitempty"`
 	Example    interface{}                            `json:"example,omitempty"`
 	Examples   map[string]ValueOrReferenceOf[Example] `json:"examples,omitempty"`
 	Encoding   map[string]Encoding                    `json:"encoding,omitempty"`
@@ -594,7 +482,7 @@ type Header struct {
 	Style           Style                                  `json:"style,omitempty"`
 	Explode         *bool                                  `json:"explode,omitempty"`
 	AllowReserved   bool                                   `json:"allowReserved,omitempty"`
-	Schema          *ValueOrReferenceOf[Schema]            `json:"schema,omitempty" validate:"required_without=Content"`
+	Schema          *oas31.Schema                          `json:"schema,omitempty" validate:"required_without=Content"`
 	Content         map[string]MediaType                   `json:"content,omitempty" validate:"required_without=Schema"`
 	Example         interface{}                            `json:"example,omitempty"`
 	Examples        map[string]ValueOrReferenceOf[Example] `json:"examples,omitempty"`
@@ -602,10 +490,10 @@ type Header struct {
 }
 
 type Tag struct {
-	Name         string                 `json:"name" validate:"required"`
-	Description  RichText               `json:"description,omitempty"`
-	ExternalDocs *ExternalDocumentation `json:"externalDocs,omitempty"`
-	Extensions   SpecificationExtension `json:"-"`
+	Name         string                       `json:"name" validate:"required"`
+	Description  RichText                     `json:"description,omitempty"`
+	ExternalDocs *oas31.ExternalDocumentation `json:"externalDocs,omitempty"`
+	Extensions   SpecificationExtension       `json:"-"`
 }
 
 // Reference is defined by https://datatracker.ietf.org/doc/html/draft-pbryan-zyp-json-ref-03d follows the same structure, behavior and rules.
@@ -626,158 +514,6 @@ func resolve(r *Reference, v interface{}) any {
 		v = t
 	}
 	return v
-}
-
-type Schema struct {
-	Title       string      `json:"title,omitempty"`
-	Description RichText    `json:"description,omitempty"`
-	Default     interface{} `json:"default,omitempty"`
-
-	MultipleOf           int                                    `json:"multipleOf,omitempty" validate:"omitempty,gt=0"`
-	Maximum              int                                    `json:"maximum,omitempty"`
-	ExclusiveMaximum     bool                                   `json:"exclusiveMaximum,omitempty"`
-	Minimum              int                                    `json:"minimum,omitempty"`
-	ExclusiveMinimum     bool                                   `json:"exclusiveMinimum,omitempty"`
-	MaxLength            int                                    `json:"maxLength,omitempty" validate:"omitempty,gte=0"`
-	MinLength            int                                    `json:"minLength,omitempty" validate:"omitempty,gte=0"`
-	Pattern              string                                 `json:"pattern,omitempty"`
-	Items                *ValueOrReferenceOf[Schema]            `json:"items,omitempty" validate:"required_if=Type 6"`
-	MaxItems             int                                    `json:"maxItems,omitempty" validate:"omitempty,gte=0"`
-	MinItems             int                                    `json:"minItems,omitempty" validate:"omitempty,gte=0"`
-	UniqueItems          bool                                   `json:"uniqueItems,omitempty"`
-	MaxProperties        int                                    `json:"maxProperties,omitempty" validate:"omitempty,gte=0"`
-	MinProperties        int                                    `json:"minProperties,omitempty" validate:"omitempty,gte=0"`
-	Required             []string                               `json:"required,omitempty" validate:"omitnil,min=1,unique"`
-	Properties           map[string]ValueOrReferenceOf[Schema]  `json:"properties,omitempty"`
-	AdditionalProperties *Or[bool, *ValueOrReferenceOf[Schema]] `json:"additionalProperties,omitempty"`
-	Enum                 []interface{}                          `json:"enum,omitempty"`
-	Type                 jsonschema.Type                        `json:"type,omitempty"`
-	AllOf                []ValueOrReferenceOf[Schema]           `json:"allOf,omitempty"`
-	AnyOf                []ValueOrReferenceOf[Schema]           `json:"anyOf,omitempty"`
-	OneOf                []ValueOrReferenceOf[Schema]           `json:"oneOf,omitempty"`
-	Not                  *ValueOrReferenceOf[Schema]            `json:"not,omitempty"`
-	Format               Format                                 `json:"format,omitempty"`
-
-	Discriminator *Discriminator         `json:"discriminator,omitempty"`
-	Xml           *XML                   `json:"xml,omitempty"`
-	ExternalDocs  *ExternalDocumentation `json:"externalDocs,omitempty"`
-	Example       interface{}            `json:"example,omitempty"`
-
-	Extensions SpecificationExtension `json:"-"`
-}
-
-// validationTag returns a tag style validation to use for a value specified by the Schema.
-//
-//	tag := validationTag(schema, v)
-//	err := validate.Var(v, tag)
-func validationTag(s Schema, typ Type) string {
-	const sep = ','
-	b := strings.Builder{}
-	switch typ {
-	case jsonschema.IntegerType, jsonschema.NumberType:
-		if s.MultipleOf != 0 {
-			b.WriteString("multipleOf=")
-			b.WriteString(strconv.Itoa(s.MultipleOf))
-			b.WriteRune(sep)
-		}
-		if s.Maximum != 0 {
-			b.WriteString("lt")
-			if !s.ExclusiveMaximum {
-				b.WriteRune('e')
-			}
-			b.WriteRune('=')
-			b.WriteString(strconv.Itoa(s.Maximum))
-			b.WriteRune(sep)
-		}
-		if s.Minimum != 0 {
-			b.WriteString("gt")
-			if !s.ExclusiveMinimum {
-				b.WriteRune('e')
-			}
-			b.WriteRune('=')
-			b.WriteString(strconv.Itoa(s.Minimum))
-			b.WriteRune(sep)
-		}
-		if len(s.Enum) > 0 {
-			var format string
-			if typ.Has(jsonschema.IntegerType) {
-				format = "%d"
-			} else {
-				format = "%f"
-			}
-			b.WriteString("one of=")
-			for _, e := range s.Enum {
-				b.WriteString(fmt.Sprintf(format, e))
-				b.WriteRune(' ')
-			}
-			b.WriteRune(sep)
-		}
-		return b.String()
-	case jsonschema.StringType:
-		if s.MaxLength != 0 {
-			b.WriteString("max=")
-			b.WriteString(strconv.Itoa(s.MaxLength))
-			b.WriteRune(sep)
-		}
-		if s.MinLength != 0 {
-			b.WriteString("min=")
-			b.WriteString(strconv.Itoa(s.MinLength))
-			b.WriteRune(sep)
-		}
-		if s.Pattern != "" {
-			b.WriteString("regex_ecma=")
-			b.WriteString(s.Pattern)
-			b.WriteRune(sep)
-		}
-		if len(s.Enum) > 0 {
-			b.WriteString("one of=")
-			for _, e := range s.Enum {
-				b.WriteString(fmt.Sprintf("%s", e))
-				b.WriteRune(' ')
-			}
-			b.WriteRune(sep)
-		}
-		return b.String()
-	case jsonschema.BooleanType:
-		if len(s.Enum) > 0 {
-			b.WriteString("one of=")
-			for _, e := range s.Enum {
-				b.WriteString(fmt.Sprintf("%t", e))
-				b.WriteRune(' ')
-			}
-			b.WriteRune(sep)
-		}
-		return ""
-	case jsonschema.ObjectType:
-		return ""
-	case jsonschema.ArrayType:
-		if s.MaxItems != 0 {
-			b.WriteString("max=")
-			b.WriteString(strconv.Itoa(s.MaxItems))
-			b.WriteRune(sep)
-		}
-		if s.MinItems != 0 {
-			b.WriteString("min=")
-			b.WriteString(strconv.Itoa(s.MinItems))
-			b.WriteRune(sep)
-		}
-		if s.UniqueItems {
-			b.WriteString("unique")
-			b.WriteRune(sep)
-		}
-		return b.String()
-	default:
-		panic(fmt.Errorf("invalid type %s", s.Type))
-	}
-}
-
-type Discriminator struct {
-	PropertyName string            `json:"propertyName" validate:"required"`
-	Mapping      map[string]string `json:"mapping,omitempty"`
-}
-
-type XML struct {
-	// TODO:
 }
 
 type SecurityScheme struct {
