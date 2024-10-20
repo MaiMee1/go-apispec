@@ -219,7 +219,7 @@ func WithTag(name string, description oas.RichText) Option {
 func WithExternalDocs(description oas.RichText, url string) Option {
 	return optionFunc(func(api *API) {
 		api.document.ExternalDocs = &oas.ExternalDocumentation{
-			Description: description,
+			Description: string(description),
 			Url:         url,
 		}
 	})

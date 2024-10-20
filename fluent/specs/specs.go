@@ -51,39 +51,45 @@ func WithSchemaDefinitions(definitions map[string]*oas.Schema) Option {
 		if api.document.Components.Schemas == nil {
 			api.document.Components.Schemas = make(map[string]oas.Schema)
 		}
-		var needed []*oas.ValueOrReferenceOf[oas.Schema]
-		for schema := range api.document.IterSchemaOrRef() {
-			if schema.Reference != nil {
-				needed = append(needed, schema)
+		var needed []string
+		for schema := range api.document.IterSchema() {
+			if schema.Ref != "" {
+				needed = append(needed, schema.Ref)
 			}
-			for schema.Value.Type.Has(jsonschema.ArrayType) {
-				if schema.Value.Items == nil {
-					// should not but may happen
-					break
+			for schema.Type.Has(jsonschema.ArrayType) {
+				if schema.Items != nil && schema.Items.Y != nil {
+					schema = schema.Items.Y
 				} else {
-					schema = schema.Value.Items
+					break
 				}
 			}
-			if schema.Value.Type.Has(jsonschema.ObjectType) {
-				name, ok := schema.Value.Extensions["Name"].(string)
+			if schema.Type.Has(jsonschema.ObjectType) {
+				name, ok := schema.Extensions["Name"].(string)
 				if ok {
-					schema.Reference = &oas.Reference{
-						Ref: fmt.Sprintf("#/components/schemas/%v", name),
-					}
-					needed = append(needed, schema)
+					needed = append(needed, fmt.Sprintf("#/components/schemas/%v", name))
 				}
 			}
 		}
 		for name, schema := range definitions {
-			hasThisName := func(schema *oas.ValueOrReferenceOf[oas.Schema]) bool {
-				if schema.Reference != nil && schema.Reference.Ref == fmt.Sprintf("#/components/schemas/%v", name) {
-					return true
-				}
-				return false
-				//return name == schema.Value.Extensions["Name"]
-			}
-			if slices.ContainsFunc(needed, hasThisName) {
+			if slices.Contains(needed, fmt.Sprintf("#/components/schemas/%v", name)) {
 				api.document.Components.Schemas[name] = *schema
+			}
+		}
+		for schema := range api.document.IterSchema() {
+			for schema.Type.Has(jsonschema.ArrayType) {
+				if schema.Items != nil && schema.Items.Y != nil {
+					schema = schema.Items.Y
+				} else {
+					break
+				}
+			}
+			if schema.Type.Has(jsonschema.ObjectType) {
+				name, ok := schema.Extensions["Name"].(string)
+				if ok {
+					var s oas.Schema
+					s.Ref = fmt.Sprintf("#/components/schemas/%v", name)
+					*schema = s
+				}
 			}
 		}
 	})

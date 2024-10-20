@@ -8,6 +8,8 @@ import (
 	"sync"
 
 	"github.com/MaiMee1/go-apispec/oas/jsonschema"
+	"github.com/MaiMee1/go-apispec/oas/jsonschema/oas31"
+	"github.com/MaiMee1/go-apispec/oas/ser"
 	"github.com/MaiMee1/go-apispec/oas/v3"
 )
 
@@ -47,7 +49,7 @@ func format2(t reflect.Type, fallback bool) oas.Format {
 	if fallback {
 		return fallbackKindToFormat[t.Kind()]
 	}
-	return oas.NoFormat
+	return ""
 }
 
 func dataType2(t reflect.Type) oas.Type {
@@ -135,9 +137,9 @@ func isRequired(sf reflect.StructField) bool {
 	return slices.Contains(tags, "required")
 }
 
-func (enc *Encoder) diveStruct(t reflect.Type) (properties map[string]oas.ValueOrReferenceOf[oas.Schema], required map[string]struct{}) {
+func (enc *Encoder) diveStruct(t reflect.Type) (properties map[string]*oas.Schema, required map[string]struct{}) {
 	required = make(map[string]struct{})
-	properties = make(map[string]oas.ValueOrReferenceOf[oas.Schema])
+	properties = make(map[string]*oas.Schema)
 	for i := 0; i < t.NumField(); i++ {
 		sf := t.Field(i)
 
@@ -186,8 +188,10 @@ func (enc *Encoder) diveStruct(t reflect.Type) (properties map[string]oas.ValueO
 		}
 
 		schema := oas.Schema{
-			Extensions: oas.SpecificationExtension{
-				"GoType": sf.Type,
+			OASMixin: oas31.OASMixin{
+				Extensions: oas.SpecificationExtension{
+					"GoType": sf.Type,
+				},
 			},
 		}
 		if jsonOpts.Contains("string") {
@@ -215,9 +219,7 @@ func (enc *Encoder) diveStruct(t reflect.Type) (properties map[string]oas.ValueO
 			schema.Type = schema.Type & ^jsonschema.NullType
 		}
 
-		properties[name] = oas.ValueOrReferenceOf[oas.Schema]{
-			Value: schema,
-		}
+		properties[name] = &schema
 	}
 	return
 }
@@ -240,12 +242,10 @@ func (enc *Encoder) objectSchema(t reflect.Type) (schema oas.Schema) {
 		t = t.Elem()
 	}
 
-	schema = oas.Schema{
-		Type:   enc.dataType(t),
-		Format: enc.format(t),
-		Extensions: oas.SpecificationExtension{
-			"GoType": t,
-		},
+	schema.Type = enc.dataType(t)
+	schema.Format = enc.format(t)
+	schema.Extensions = oas.SpecificationExtension{
+		"GoType": t,
 	}
 	switch t.Kind() {
 	case reflect.Struct:
@@ -264,15 +264,13 @@ func (enc *Encoder) objectSchema(t reflect.Type) (schema oas.Schema) {
 		schema.Type = jsonschema.AnyType
 	case reflect.Map:
 		item := enc.objectSchema(t.Elem())
-		schema.AdditionalProperties = &oas.Or[bool, *oas.ValueOrReferenceOf[oas.Schema]]{
-			Y: &oas.ValueOrReferenceOf[oas.Schema]{
-				Value: item,
-			},
+		schema.AdditionalProperties = &ser.Or[bool, *oas.Schema]{
+			Y: &item,
 		}
 	case reflect.Slice, reflect.Array:
 		item := enc.objectSchema(t.Elem())
-		schema.Items = &oas.ValueOrReferenceOf[oas.Schema]{
-			Value: item,
+		schema.Items = &ser.Or[bool, *oas.Schema]{
+			Y: &item,
 		}
 	default:
 	}

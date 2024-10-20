@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/MaiMee1/go-apispec/oas/jsonschema/draft2020"
 	"github.com/MaiMee1/go-apispec/oas/v3"
 )
 
@@ -70,16 +71,16 @@ func WithBody(description oas.RichText, required bool, keyAndValues ...interface
 		switch v := value.(type) {
 		case oas.Schema:
 			body.Content[key] = oas.MediaType{
-				Schema: oas.ValueOrReferenceOf[oas.Schema]{
-					Value: v,
-				},
+				Schema:   &v,
 				Example:  nil,
 				Examples: nil,
 			}
 		case oas.Reference:
 			body.Content[key] = oas.MediaType{
-				Schema: oas.ValueOrReferenceOf[oas.Schema]{
-					Reference: &oas.Reference{},
+				Schema: &oas.Schema{
+					ReferenceMixin: draft2020.ReferenceMixin{
+						Ref: v.Ref,
+					},
 				},
 				Example:  nil,
 				Examples: nil,
@@ -122,16 +123,16 @@ func WithResponse(code int, description oas.RichText, keyAndValues ...interface{
 		switch v := value.(type) {
 		case oas.Schema:
 			response.Content[key] = oas.MediaType{
-				Schema: oas.ValueOrReferenceOf[oas.Schema]{
-					Value: v,
-				},
+				Schema:   &v,
 				Example:  nil,
 				Examples: nil,
 			}
 		case oas.Reference:
 			response.Content[key] = oas.MediaType{
-				Schema: oas.ValueOrReferenceOf[oas.Schema]{
-					Reference: &v,
+				Schema: &oas.Schema{
+					ReferenceMixin: draft2020.ReferenceMixin{
+						Ref: v.Ref,
+					},
 				},
 				Example:  nil,
 				Examples: nil,

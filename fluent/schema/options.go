@@ -27,7 +27,7 @@ func WithTitle(title string) Option {
 
 func WithDescription(description oas.RichText) Option {
 	return optionFunc(func(schema *oas.Schema) {
-		schema.Description = description
+		schema.Description = string(description)
 	})
 }
 

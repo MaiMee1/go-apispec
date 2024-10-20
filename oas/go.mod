@@ -2,7 +2,10 @@ module github.com/MaiMee1/go-apispec/oas
 
 go 1.23
 
-require github.com/go-playground/validator/v10 v10.22.1
+require (
+	github.com/go-playground/validator/v10 v10.22.1
+	golang.org/x/exp v0.0.0-20241009180824-f66d83c29e7c
+)
 
 require (
 	github.com/gabriel-vasile/mimetype v1.4.3 // indirect

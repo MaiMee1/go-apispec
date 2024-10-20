@@ -5,15 +5,11 @@ import (
 	"github.com/MaiMee1/go-apispec/oas/v3"
 )
 
-func Array(item oas.Schema, opts ...Option) oas.Schema {
-	schema := &oas.Schema{
-		Type: jsonschema.ArrayType,
-		Items: &oas.ValueOrReferenceOf[oas.Schema]{
-			Value: item,
-		},
-	}
+func Array(item oas.Schema, opts ...Option) (schema oas.Schema) {
+	schema.Type = jsonschema.ArrayType
+	schema.Items.Y = &item
 	for _, opt := range opts {
-		opt.apply(schema)
+		opt.apply(&schema)
 	}
-	return *schema
+	return schema
 }
