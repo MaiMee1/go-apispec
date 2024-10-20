@@ -1,46 +1,22 @@
 package oas
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
-	"os"
-	"reflect"
 	"testing"
-
-	"github.com/MaiMee1/go-apispec/oas/internal/validate"
 )
 
 func TestOpenAPI_UnmarshalJSON(t *testing.T) {
-	ctx := context.TODO()
-
-	file, err := os.ReadFile("testdata/petstore.json")
+	document, err := New("testdata/petstore.json")
 	if err != nil {
-		t.Fatal(err)
-	}
-
-	var root interface{}
-	if err := json.Unmarshal(file, &root); err != nil {
-		t.Fatal(err)
-	}
-	ctx = context.WithValue(ctx, "Root", root)
-
-	var document OpenAPI
-	if err = json.Unmarshal(file, &document); err != nil {
-		t.Fatal(err)
-	}
-	v := reflect.ValueOf(&document)
-	setRoot(v, root)
-
-	if err := validate.Struct(document); err != nil {
 		t.Error(err)
 	}
 
 	if document.Version != "3.0.3" {
 		t.Error(document.Version)
 	}
-	for k, m := range document.Paths["/pet"].Put.RequestBody.Value.Content {
-		b, err := json.Marshal(m.Schema.Resolve(ctx))
+	for k, m := range document.Paths["/pet"].Put.RequestBody.Content {
+		b, err := json.Marshal(m.Schema.Resolve())
 		if err != nil {
 			t.Error(err)
 		}

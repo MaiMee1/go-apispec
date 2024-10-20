@@ -1,24 +1,26 @@
 package oas
 
 import (
+	"context"
 	"iter"
 	"reflect"
 	"strings"
 
+	"github.com/MaiMee1/go-apispec/oas/jsonschema/draft2020"
 	"github.com/MaiMee1/go-apispec/oas/jsonschema/oas31"
 )
 
-var valueOrReferenceOfPrefix = strings.TrimSuffix(reflect.TypeOf(ValueOrReferenceOf[bool]{}).Name(), "[bool]")
-var trueWhenValueOrReferenceOf = func(v reflect.Value) bool {
-	return strings.HasPrefix(v.Type().Name(), valueOrReferenceOfPrefix)
+var referenceMixinPrefix = strings.TrimSuffix(reflect.TypeOf(draft2020.ReferenceMixin[bool]{}).Name(), "[bool]")
+var trueWhenReferenceMixinPrefix = func(v reflect.Value) bool {
+	return strings.Contains(v.Type().Name(), referenceMixinPrefix)
 }
 
-// setRoot recursively find ValueOrReferenceOf fields or elements and sets its Root to root.
-func setRoot(v reflect.Value, root interface{}) {
-	s := reflect.ValueOf(root)
-	for v := range iterValueOrReference(v, trueWhenValueOrReferenceOf, true) {
-		f := v.FieldByName("Root")
-		f.Set(s)
+// setContext recursively find ReferenceMixin fields or elements and sets its ctx to ctx.
+func setContext(v reflect.Value, ctx context.Context) {
+	param1 := reflect.ValueOf(ctx)
+	for v := range iterValueOrReference(v, trueWhenReferenceMixinPrefix, true) {
+		f := v.MethodByName("WithContext")
+		f.Call([]reflect.Value{param1})
 	}
 }
 
@@ -41,16 +43,16 @@ func iterValueOrReference(v reflect.Value, f func(v reflect.Value) bool, makeCan
 			}
 		case reflect.Struct:
 			for i := 0; i < v.NumField(); i++ {
+				if f(v.Field(i)) {
+					//fmt.Println(">>>", v.Field(i))
+					if !yield(v.Field(i).Addr()) {
+						return
+					}
+				}
 				for f := range iterValueOrReference(v.Field(i), f, makeCanSet) {
 					if !yield(f) {
 						return
 					}
-				}
-			}
-			if f(v) {
-				//fmt.Println(">>>", v.Type())
-				if !yield(v) {
-					return
 				}
 			}
 		case reflect.Slice, reflect.Array:
@@ -83,20 +85,6 @@ func iterValueOrReference(v reflect.Value, f func(v reflect.Value) bool, makeCan
 				}
 			}
 		default:
-		}
-	}
-}
-
-func (doc *OpenAPI) IterRef() iter.Seq[*Reference] {
-	return func(yield func(*Reference) bool) {
-		v := reflect.ValueOf(doc)
-		for v := range iterValueOrReference(v, trueWhenValueOrReferenceOf, false) {
-			ref := v.FieldByName("Reference").Interface().(*Reference)
-			if ref != nil {
-				if !yield(ref) {
-					return
-				}
-			}
 		}
 	}
 }

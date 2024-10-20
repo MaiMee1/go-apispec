@@ -2,10 +2,8 @@ package draft2020
 
 import (
 	"context"
-	"encoding/json"
-	"fmt"
-	"strings"
 
+	"github.com/MaiMee1/go-apispec/oas/jsonpointer"
 	"github.com/MaiMee1/go-apispec/oas/jsonschema"
 )
 
@@ -32,9 +30,11 @@ func (m *MetaSchemaMixin[S]) Validate(v interface{}) error {
 	return nil
 }
 
-type ReferenceMixin[S jsonschema.Keyword] struct {
+type ReferenceMixin[S any] struct {
 	Ref        string `json:"$ref,omitempty" validate:"uri-reference"`
 	DynamicRef string `json:"$dynamicRef,omitempty" validate:"uri-reference"`
+
+	ctx context.Context
 }
 
 func (m *ReferenceMixin[S]) Kind() jsonschema.Kind {
@@ -46,43 +46,23 @@ func (m *ReferenceMixin[S]) AppliesTo(t jsonschema.Type) bool {
 }
 
 func (m *ReferenceMixin[S]) Validate(v interface{}) error {
-	if m.Ref == "" && m.DynamicRef == "" {
-		return nil
-	}
-	if m.Ref != "" {
-		//TODO implement me
-	}
-	panic("implement me")
+	return nil
 }
 
-func (m *ReferenceMixin[S]) Resolve(ctx context.Context) S {
-	root := ctx.Value("Root")
+func (m *ReferenceMixin[S]) WithContext(ctx context.Context) *ReferenceMixin[S] {
+	m.ctx = ctx
+	return m
+}
+
+func (m *ReferenceMixin[S]) Resolve() S {
+	root := m.ctx.Value("Root")
 	if root == nil {
 		panic("root not available")
 	}
 
-	var schema S
-	b, err := json.Marshal(resolve(m.Ref, root))
+	v, err := jsonpointer.UriFragment(m.Ref).Access(root)
 	if err != nil {
 		panic(err)
 	}
-	if err := json.Unmarshal(b, &schema); err != nil {
-		panic(err)
-	}
-	return schema
-}
-
-func resolve(uri string, v interface{}) interface{} {
-	parts := strings.Split(uri, "/")
-	if parts[0] != "#" {
-		panic(fmt.Errorf("invalid reference format: %s", uri))
-	}
-	for _, part := range parts[1:] {
-		t, ok := v.(map[string]interface{})[part]
-		if !ok {
-			panic(fmt.Sprintf("key not found: %s", part))
-		}
-		v = t
-	}
-	return v
+	return v.Interface().(S)
 }

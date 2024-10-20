@@ -4,7 +4,7 @@ package flag
 import (
 	"iter"
 
-	"golang.org/x/exp/constraints"
+	"github.com/MaiMee1/go-apispec/oas/internal/constraints"
 )
 
 func Has[F constraints.Unsigned](flag F, possible iter.Seq[F], ands ...F) bool {

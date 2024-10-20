@@ -4,14 +4,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"maps"
-	"reflect"
 	"regexp"
 	"slices"
-	"strings"
 
 	"github.com/MaiMee1/go-apispec/oas/iana"
 	"github.com/MaiMee1/go-apispec/oas/internal/validate"
 	"github.com/MaiMee1/go-apispec/oas/jsonschema"
+	"github.com/MaiMee1/go-apispec/oas/jsonschema/draft2020"
 	"github.com/MaiMee1/go-apispec/oas/jsonschema/oas31"
 )
 
@@ -170,57 +169,6 @@ func (s *Scheme) UnmarshalJSON(b []byte) error {
 
 type RuntimeExpression string
 
-type ValueOrReferenceOf[T any] struct {
-	Value     T
-	Reference *Reference
-	Root      interface{} // a reference to the root document, set via reflection
-}
-
-func (o ValueOrReferenceOf[T]) Resolve(v ...interface{}) T {
-	root := o.Root
-	if root == nil {
-		if len(v) > 0 {
-			root = v[0]
-		} else {
-			panic("root not available")
-		}
-	}
-
-	var t T
-	if o.Reference != nil {
-		b, _ := json.Marshal(resolve(o.Reference, root))
-		_ = json.Unmarshal(b, &t)
-		setRoot(reflect.ValueOf(t), root)
-		return t
-	}
-	return o.Value
-}
-
-//goland:noinspection GoMixedReceiverTypes
-func (o *ValueOrReferenceOf[T]) UnmarshalJSON(b []byte) error {
-	var r Reference
-	if err := json.Unmarshal(b, &r); err != nil {
-		return err
-	}
-	var v T
-	if err := json.Unmarshal(b, &v); err != nil {
-		return err
-	}
-	o.Value = v
-	if r.Ref != "" {
-		o.Reference = &r
-	}
-	return nil
-}
-
-//goland:noinspection GoMixedReceiverTypes
-func (o ValueOrReferenceOf[T]) MarshalJSON() ([]byte, error) {
-	if o.Reference != nil {
-		return json.Marshal(o.Reference)
-	}
-	return json.Marshal(o.Value)
-}
-
 type DataType struct {
 	Type   jsonschema.Type `json:"type" validate:"required"`
 	Format Format          `json:"format,omitempty"`
@@ -243,16 +191,16 @@ func Default() OpenAPI {
 }
 
 type OpenAPI struct {
-	Version      SemanticVersion                         `json:"openapi" validate:"required"`
-	Info         Info                                    `json:"info" validate:"required"`
-	Servers      []Server                                `json:"servers,omitempty" validate:"dive"`
-	Paths        Paths                                   `json:"paths,omitempty" validate:"dive"`
-	Webhooks     map[string]ValueOrReferenceOf[PathItem] `json:"webhooks,omitempty" validate:"dive"`
-	Components   Components                              `json:"components"`
-	Security     []SecurityRequirement                   `json:"security,omitempty" validate:"dive"`
-	Tags         []Tag                                   `json:"tags,omitempty" validate:"dive"`
-	ExternalDocs *oas31.ExternalDocumentation            `json:"externalDocs,omitempty"`
-	Extensions   SpecificationExtension                  `json:"-"`
+	Version      SemanticVersion              `json:"openapi" validate:"required"`
+	Info         Info                         `json:"info" validate:"required"`
+	Servers      []Server                     `json:"servers,omitempty" validate:"dive"`
+	Paths        Paths                        `json:"paths,omitempty" validate:"dive"`
+	Webhooks     map[string]PathItem          `json:"webhooks,omitempty" validate:"dive"`
+	Components   Components                   `json:"components"`
+	Security     []SecurityRequirement        `json:"security,omitempty" validate:"dive"`
+	Tags         []Tag                        `json:"tags,omitempty" validate:"dive"`
+	ExternalDocs *oas31.ExternalDocumentation `json:"externalDocs,omitempty"`
+	Extensions   SpecificationExtension       `json:"-"`
 }
 
 func (doc *OpenAPI) Validate() error {
@@ -298,7 +246,7 @@ type ServerVariable struct {
 }
 
 type Components struct {
-	Schemas         map[string]oas31.Schema   `json:"schemas,omitempty" validate:"dive"`
+	Schemas         map[string]*oas31.Schema  `json:"schemas,omitempty" validate:"dive"`
 	Responses       map[string]Response       `json:"responses,omitempty" validate:"dive"`
 	Parameters      map[string]Parameter      `json:"parameters,omitempty" validate:"dive"`
 	Examples        map[string]Example        `json:"examples,omitempty" validate:"dive"`
@@ -320,20 +268,21 @@ func isValidComponentsKey(key string) bool {
 type Paths map[string]PathItem
 
 type PathItem struct {
-	Ref         string                          `json:"$ref,omitempty" validate:"omitempty,uri"`
-	Summary     string                          `json:"summary,omitempty"`
-	Description RichText                        `json:"description,omitempty"`
-	Get         *Operation                      `json:"get,omitempty"`
-	Put         *Operation                      `json:"put,omitempty"`
-	Post        *Operation                      `json:"post,omitempty"`
-	Delete      *Operation                      `json:"delete,omitempty"`
-	Options     *Operation                      `json:"options,omitempty"`
-	Head        *Operation                      `json:"head,omitempty"`
-	Patch       *Operation                      `json:"patch,omitempty"`
-	Trace       *Operation                      `json:"trace,omitempty"`
-	Servers     []Server                        `json:"servers,omitempty"`
-	Parameters  []ValueOrReferenceOf[Parameter] `json:"parameters,omitempty"`
-	Extensions  SpecificationExtension          `json:"-"`
+	draft2020.ReferenceMixin[PathItem]
+	Ref         string                 `json:"$ref,omitempty" validate:"omitempty,uri"`
+	Summary     string                 `json:"summary,omitempty"`
+	Description RichText               `json:"description,omitempty"`
+	Get         *Operation             `json:"get,omitempty"`
+	Put         *Operation             `json:"put,omitempty"`
+	Post        *Operation             `json:"post,omitempty"`
+	Delete      *Operation             `json:"delete,omitempty"`
+	Options     *Operation             `json:"options,omitempty"`
+	Head        *Operation             `json:"head,omitempty"`
+	Patch       *Operation             `json:"patch,omitempty"`
+	Trace       *Operation             `json:"trace,omitempty"`
+	Servers     []Server               `json:"servers,omitempty"`
+	Parameters  []Parameter            `json:"parameters,omitempty"`
+	Extensions  SpecificationExtension `json:"-"`
 }
 
 func (i *PathItem) Range() map[string]Operation {
@@ -366,39 +315,41 @@ func (i *PathItem) Range() map[string]Operation {
 }
 
 type Operation struct {
-	Tags         []string                                `json:"tags,omitempty"`
-	Summary      string                                  `json:"summary"`
-	Description  RichText                                `json:"description"`
-	ExternalDocs *oas31.ExternalDocumentation            `json:"externalDocs,omitempty"`
-	OperationId  string                                  `json:"operationId,omitempty"`
-	Parameters   []ValueOrReferenceOf[Parameter]         `json:"parameters,omitempty" validate:"dive"`
-	RequestBody  *ValueOrReferenceOf[RequestBody]        `json:"requestBody,omitempty"`
-	Responses    Responses                               `json:"responses,omitempty" validate:"dive"`
-	Callbacks    map[string]ValueOrReferenceOf[Callback] `json:"callbacks,omitempty" validate:"dive"`
-	Deprecated   bool                                    `json:"deprecated,omitempty"`
-	Security     []SecurityRequirement                   `json:"security,omitempty" validate:"dive"`
-	Servers      []Server                                `json:"servers,omitempty" validate:"dive"`
-	Extensions   SpecificationExtension                  `json:"-"`
+	Tags         []string                     `json:"tags,omitempty"`
+	Summary      string                       `json:"summary"`
+	Description  RichText                     `json:"description"`
+	ExternalDocs *oas31.ExternalDocumentation `json:"externalDocs,omitempty"`
+	OperationId  string                       `json:"operationId,omitempty"`
+	Parameters   []Parameter                  `json:"parameters,omitempty" validate:"dive"`
+	RequestBody  *RequestBody                 `json:"requestBody,omitempty"`
+	Responses    Responses                    `json:"responses,omitempty" validate:"dive"`
+	Callbacks    map[string]Callback          `json:"callbacks,omitempty" validate:"dive"`
+	Deprecated   bool                         `json:"deprecated,omitempty"`
+	Security     []SecurityRequirement        `json:"security,omitempty" validate:"dive"`
+	Servers      []Server                     `json:"servers,omitempty" validate:"dive"`
+	Extensions   SpecificationExtension       `json:"-"`
 }
 
 type Parameter struct {
-	Name            string                                 `json:"name" validate:"required"`
-	In              Location                               `json:"in" validate:"required"`
-	Description     RichText                               `json:"description"`
-	Required        bool                                   `json:"required" validate:"required_if=In 3"`
-	Deprecated      bool                                   `json:"deprecated,omitempty"`
-	AllowEmptyValue bool                                   `json:"allowEmptyValue,omitempty"` // Deprecated
-	Style           Style                                  `json:"style,omitempty"`
-	Explode         *bool                                  `json:"explode,omitempty"`
-	AllowReserved   bool                                   `json:"allowReserved,omitempty"`
-	Schema          *oas31.Schema                          `json:"schema,omitempty" validate:"required_without=Content"`
-	Content         map[string]MediaType                   `json:"content,omitempty" validate:"required_without=Schema"`
-	Example         interface{}                            `json:"example,omitempty"`
-	Examples        map[string]ValueOrReferenceOf[Example] `json:"examples,omitempty"`
-	Extensions      SpecificationExtension                 `json:"-"`
+	draft2020.ReferenceMixin[Parameter]
+	Name            string                 `json:"name" validate:"required"`
+	In              Location               `json:"in" validate:"required"`
+	Description     RichText               `json:"description"`
+	Required        bool                   `json:"required" validate:"required_if=In 3"`
+	Deprecated      bool                   `json:"deprecated,omitempty"`
+	AllowEmptyValue bool                   `json:"allowEmptyValue,omitempty"` // Deprecated
+	Style           Style                  `json:"style,omitempty"`
+	Explode         *bool                  `json:"explode,omitempty"`
+	AllowReserved   bool                   `json:"allowReserved,omitempty"`
+	Schema          *oas31.Schema          `json:"schema,omitempty" validate:"required_without=Content"`
+	Content         map[string]MediaType   `json:"content,omitempty" validate:"required_without=Schema"`
+	Example         interface{}            `json:"example,omitempty"`
+	Examples        map[string]Example     `json:"examples,omitempty"`
+	Extensions      SpecificationExtension `json:"-"`
 }
 
 type RequestBody struct {
+	draft2020.ReferenceMixin[RequestBody]
 	Description RichText               `json:"description"`
 	Content     map[string]MediaType   `json:"content" validate:"required"`
 	Required    bool                   `json:"required"`
@@ -406,23 +357,23 @@ type RequestBody struct {
 }
 
 type MediaType struct {
-	Schema     *oas31.Schema                          `json:"schema,omitempty"`
-	Example    interface{}                            `json:"example,omitempty"`
-	Examples   map[string]ValueOrReferenceOf[Example] `json:"examples,omitempty"`
-	Encoding   map[string]Encoding                    `json:"encoding,omitempty"`
-	Extensions SpecificationExtension                 `json:"-"`
+	Schema     *oas31.Schema          `json:"schema,omitempty"`
+	Example    interface{}            `json:"example,omitempty"`
+	Examples   map[string]Example     `json:"examples,omitempty"`
+	Encoding   map[string]Encoding    `json:"encoding,omitempty"`
+	Extensions SpecificationExtension `json:"-"`
 }
 
 type Encoding struct {
-	ContentType   string                                `json:"contentType"`
-	Headers       map[string]ValueOrReferenceOf[Header] `json:"headers,omitempty"`
-	Style         Style                                 `json:"style,omitempty"`
-	Explode       *bool                                 `json:"explode,omitempty"`
-	AllowReserved bool                                  `json:"allowReserved,omitempty"`
-	Extensions    SpecificationExtension                `json:"-"`
+	ContentType   string                 `json:"contentType"`
+	Headers       map[string]Header      `json:"headers,omitempty"`
+	Style         Style                  `json:"style,omitempty"`
+	Explode       *bool                  `json:"explode,omitempty"`
+	AllowReserved bool                   `json:"allowReserved,omitempty"`
+	Extensions    SpecificationExtension `json:"-"`
 }
 
-type Responses map[string]ValueOrReferenceOf[Response]
+type Responses map[string]Response
 
 func (r Responses) Validate() error {
 	for key := range maps.Keys(r) {
@@ -448,14 +399,46 @@ func isValidContentKey(key string) bool {
 }
 
 type Response struct {
-	Description RichText                              `json:"description" validate:"required"`
-	Headers     map[string]ValueOrReferenceOf[Header] `json:"headers,omitempty"`
-	Content     map[string]MediaType                  `json:"content,omitempty"`
-	Links       map[string]ValueOrReferenceOf[Link]   `json:"links,omitempty"`
-	Extensions  SpecificationExtension                `json:"-"`
+	draft2020.ReferenceMixin[Response]
+	Description RichText               `json:"description" validate:"required"`
+	Headers     map[string]Header      `json:"headers,omitempty"`
+	Content     map[string]MediaType   `json:"content,omitempty"`
+	Links       map[string]Link        `json:"links,omitempty"`
+	Extensions  SpecificationExtension `json:"-"`
 }
 
-type Callback map[RuntimeExpression]ValueOrReferenceOf[PathItem]
+type Callback struct {
+	draft2020.ReferenceMixin[Callback]
+	callback map[RuntimeExpression]PathItem
+}
+
+//goland:noinspection GoMixedReceiverTypes
+func (c Callback) MarshalJSON() ([]byte, error) {
+	if c.Ref != "" || c.DynamicRef != "" {
+		return json.Marshal(c.ReferenceMixin)
+	}
+	return json.Marshal(c.callback)
+}
+
+//goland:noinspection GoMixedReceiverTypes
+func (c *Callback) UnmarshalJSON(b []byte) error {
+	var mixin draft2020.ReferenceMixin[Callback]
+	if err := json.Unmarshal(b, &mixin); err != nil {
+		return err
+	}
+
+	var callback map[RuntimeExpression]PathItem
+	if err := json.Unmarshal(b, &callback); err != nil {
+		return err
+	}
+	delete(callback, "$ref")
+	delete(callback, "$dynamicRef")
+	*c = Callback{
+		ReferenceMixin: mixin,
+		callback:       callback,
+	}
+	return nil
+}
 
 func isValidCallbackKey(key string) bool {
 	// TODO: valid runtime expression
@@ -463,6 +446,7 @@ func isValidCallbackKey(key string) bool {
 }
 
 type Example struct {
+	draft2020.ReferenceMixin[Example]
 	Summary       string                 `json:"summary"`
 	Description   RichText               `json:"description"`
 	Value         interface{}            `json:"value,omitempty" validate:"excluded_with=ExternalValue"`
@@ -471,6 +455,7 @@ type Example struct {
 }
 
 type Link struct {
+	draft2020.ReferenceMixin[Link]
 	OperationRef string                 `json:"operationRef,omitempty" validate:"required_without=OperationId"`
 	OperationId  string                 `json:"operationId,omitempty" validate:"required_without=OperationRef"`
 	Parameters   map[string]interface{} `json:"parameters,omitempty"`
@@ -481,18 +466,19 @@ type Link struct {
 }
 
 type Header struct {
-	Description     RichText                               `json:"description"`
-	Required        bool                                   `json:"required" validate:"required_if=In path"`
-	Deprecated      bool                                   `json:"deprecated"`
-	AllowEmptyValue bool                                   `json:"allowEmptyValue,omitempty"` // Deprecated
-	Style           Style                                  `json:"style,omitempty"`
-	Explode         *bool                                  `json:"explode,omitempty"`
-	AllowReserved   bool                                   `json:"allowReserved,omitempty"`
-	Schema          *oas31.Schema                          `json:"schema,omitempty" validate:"required_without=Content"`
-	Content         map[string]MediaType                   `json:"content,omitempty" validate:"required_without=Schema"`
-	Example         interface{}                            `json:"example,omitempty"`
-	Examples        map[string]ValueOrReferenceOf[Example] `json:"examples,omitempty"`
-	Extensions      SpecificationExtension                 `json:"-"`
+	draft2020.ReferenceMixin[Header]
+	Description     RichText               `json:"description"`
+	Required        bool                   `json:"required" validate:"required_if=In path"`
+	Deprecated      bool                   `json:"deprecated"`
+	AllowEmptyValue bool                   `json:"allowEmptyValue,omitempty"` // Deprecated
+	Style           Style                  `json:"style,omitempty"`
+	Explode         *bool                  `json:"explode,omitempty"`
+	AllowReserved   bool                   `json:"allowReserved,omitempty"`
+	Schema          *oas31.Schema          `json:"schema,omitempty" validate:"required_without=Content"`
+	Content         map[string]MediaType   `json:"content,omitempty" validate:"required_without=Schema"`
+	Example         interface{}            `json:"example,omitempty"`
+	Examples        map[string]Example     `json:"examples,omitempty"`
+	Extensions      SpecificationExtension `json:"-"`
 }
 
 type Tag struct {
@@ -500,26 +486,6 @@ type Tag struct {
 	Description  RichText                     `json:"description,omitempty"`
 	ExternalDocs *oas31.ExternalDocumentation `json:"externalDocs,omitempty"`
 	Extensions   SpecificationExtension       `json:"-"`
-}
-
-// Reference is defined by https://datatracker.ietf.org/doc/html/draft-pbryan-zyp-json-ref-03d follows the same structure, behavior and rules.
-type Reference struct {
-	Ref string `json:"$ref" validate:"required,url_fragment"`
-}
-
-func resolve(r *Reference, v interface{}) any {
-	parts := strings.Split(r.Ref, "/")
-	if parts[0] != "#" {
-		panic(fmt.Errorf("invalid reference format: %s", r.Ref))
-	}
-	for _, part := range parts[1:] {
-		t, ok := v.(map[string]interface{})[part]
-		if !ok {
-			panic(fmt.Sprintf("key not found: %s", part))
-		}
-		v = t
-	}
-	return v
 }
 
 type SecurityScheme struct {
