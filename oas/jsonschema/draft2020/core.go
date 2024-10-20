@@ -32,20 +32,20 @@ func (m *MetaSchemaMixin[S]) Validate(v interface{}) error {
 	return nil
 }
 
-type ReferenceMixin struct {
+type ReferenceMixin[S jsonschema.Keyword] struct {
 	Ref        string `json:"$ref,omitempty" validate:"uri-reference"`
 	DynamicRef string `json:"$dynamicRef,omitempty" validate:"uri-reference"`
 }
 
-func (m *ReferenceMixin) Kind() jsonschema.Kind {
+func (m *ReferenceMixin[S]) Kind() jsonschema.Kind {
 	return jsonschema.Applicator
 }
 
-func (m *ReferenceMixin) AppliesTo(t jsonschema.Type) bool {
+func (m *ReferenceMixin[S]) AppliesTo(t jsonschema.Type) bool {
 	return true
 }
 
-func (m *ReferenceMixin) Validate(v interface{}) error {
+func (m *ReferenceMixin[S]) Validate(v interface{}) error {
 	if m.Ref == "" && m.DynamicRef == "" {
 		return nil
 	}
@@ -55,15 +55,20 @@ func (m *ReferenceMixin) Validate(v interface{}) error {
 	panic("implement me")
 }
 
-func (m *ReferenceMixin) Resolve(ctx context.Context) Schema {
+func (m *ReferenceMixin[S]) Resolve(ctx context.Context) S {
 	root := ctx.Value("Root")
 	if root == nil {
 		panic("root not available")
 	}
 
-	var schema Schema
-	b, _ := json.Marshal(resolve(m.Ref, root))
-	_ = json.Unmarshal(b, &schema)
+	var schema S
+	b, err := json.Marshal(resolve(m.Ref, root))
+	if err != nil {
+		panic(err)
+	}
+	if err := json.Unmarshal(b, &schema); err != nil {
+		panic(err)
+	}
 	return schema
 }
 

@@ -12,7 +12,7 @@ var zero Schema
 
 type Schema struct {
 	MetaSchemaMixin[*Schema]
-	ReferenceMixin
+	ReferenceMixin[*Schema]
 	MetaDataMixin
 	ValidationMixin
 	StringMixin
