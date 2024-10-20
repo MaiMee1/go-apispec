@@ -16,6 +16,15 @@ import (
 )
 
 type (
+	Schema                = oas31.Schema
+	ExternalDocumentation = oas31.ExternalDocumentation
+	Discriminator         = oas31.Discriminator
+	XML                   = oas31.XML
+	// SpecificationExtension properties are implemented as patterned fields that are always prefixed by "x-".
+	SpecificationExtension = oas31.SpecificationExtension
+)
+
+type (
 	SemanticVersion string
 	Type            = jsonschema.Type
 	Format          = jsonschema.Format
@@ -222,9 +231,6 @@ type UrlTemplate string
 
 // RichText supports CommonMark markdown formatting.
 type RichText string
-
-// SpecificationExtension properties are implemented as patterned fields that are always prefixed by "x-".
-type SpecificationExtension = oas31.SpecificationExtension
 
 // Default returns a minimal starting OpenAPI specs.
 func Default() OpenAPI {
