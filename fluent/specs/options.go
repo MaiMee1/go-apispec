@@ -125,27 +125,25 @@ func WithWebhook(name string, method string, opts ...operation.Option) Option {
 	return optionFunc(func(api *API) {
 		itemOrRef, ok := api.document.Webhooks[name]
 		if !ok {
-			itemOrRef = oas.ValueOrReferenceOf[oas.PathItem]{
-				Value: oas.PathItem{},
-			}
+			itemOrRef = oas.PathItem{}
 		}
 		switch method {
 		case http.MethodGet:
-			itemOrRef.Value.Get = op
+			itemOrRef.Get = op
 		case http.MethodHead:
-			itemOrRef.Value.Head = op
+			itemOrRef.Head = op
 		case http.MethodPost:
-			itemOrRef.Value.Post = op
+			itemOrRef.Post = op
 		case http.MethodPut:
-			itemOrRef.Value.Put = op
+			itemOrRef.Put = op
 		case http.MethodPatch:
-			itemOrRef.Value.Patch = op
+			itemOrRef.Patch = op
 		case http.MethodDelete:
-			itemOrRef.Value.Delete = op
+			itemOrRef.Delete = op
 		case http.MethodOptions:
-			itemOrRef.Value.Options = op
+			itemOrRef.Options = op
 		case http.MethodTrace:
-			itemOrRef.Value.Trace = op
+			itemOrRef.Trace = op
 		default:
 			panic(fmt.Errorf("invalid http method: %s", method))
 		}

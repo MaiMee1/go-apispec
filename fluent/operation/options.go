@@ -41,17 +41,17 @@ func WithTags(tags ...string) Option {
 func WithParams(parameters ...oas.Parameter) Option {
 	return optionFunc(func(operation *oas.Operation) {
 		for _, param := range parameters {
-			operation.Parameters = append(operation.Parameters, oas.ValueOrReferenceOf[oas.Parameter]{
-				Value: param,
-			})
+			operation.Parameters = append(operation.Parameters, param)
 		}
 	})
 }
 
-func WithParamReference(ref oas.Reference) Option {
+func WithParamReference(ref string) Option {
 	return optionFunc(func(operation *oas.Operation) {
-		operation.Parameters = append(operation.Parameters, oas.ValueOrReferenceOf[oas.Parameter]{
-			Reference: &ref,
+		operation.Parameters = append(operation.Parameters, oas.Parameter{
+			ReferenceMixin: draft2020.ReferenceMixin[oas.Parameter]{
+				Ref: ref,
+			},
 		})
 	})
 }
@@ -75,29 +75,19 @@ func WithBody(description oas.RichText, required bool, keyAndValues ...interface
 				Example:  nil,
 				Examples: nil,
 			}
-		case oas.Reference:
-			body.Content[key] = oas.MediaType{
-				Schema: &oas.Schema{
-					ReferenceMixin: draft2020.ReferenceMixin[*oas.Schema]{
-						Ref: v.Ref,
-					},
-				},
-				Example:  nil,
-				Examples: nil,
-			}
 		}
 	}
 	return optionFunc(func(operation *oas.Operation) {
-		operation.RequestBody = &oas.ValueOrReferenceOf[oas.RequestBody]{
-			Value: body,
-		}
+		operation.RequestBody = &body
 	})
 }
 
-func WithBodyReference(ref oas.Reference) Option {
+func WithBodyReference(ref string) Option {
 	return optionFunc(func(operation *oas.Operation) {
-		operation.RequestBody = &oas.ValueOrReferenceOf[oas.RequestBody]{
-			Reference: &ref,
+		operation.RequestBody = &oas.RequestBody{
+			ReferenceMixin: draft2020.ReferenceMixin[oas.RequestBody]{
+				Ref: ref,
+			},
 		}
 	})
 }
@@ -127,29 +117,19 @@ func WithResponse(code int, description oas.RichText, keyAndValues ...interface{
 				Example:  nil,
 				Examples: nil,
 			}
-		case oas.Reference:
-			response.Content[key] = oas.MediaType{
-				Schema: &oas.Schema{
-					ReferenceMixin: draft2020.ReferenceMixin[*oas.Schema]{
-						Ref: v.Ref,
-					},
-				},
-				Example:  nil,
-				Examples: nil,
-			}
+		default:
+			panic(fmt.Errorf("value is invalid type %v", v))
 		}
 	}
 	return optionFunc(func(operation *oas.Operation) {
 		if operation.Responses == nil {
 			operation.Responses = make(oas.Responses)
 		}
-		operation.Responses[status] = oas.ValueOrReferenceOf[oas.Response]{
-			Value: response,
-		}
+		operation.Responses[status] = response
 	})
 }
 
-func WithResponseReference(code int, ref oas.Reference) Option {
+func WithResponseReference(code int, ref string) Option {
 	status := strconv.Itoa(code)
 	if code == 0 {
 		status = "default"
@@ -158,8 +138,10 @@ func WithResponseReference(code int, ref oas.Reference) Option {
 		if operation.Responses == nil {
 			operation.Responses = make(oas.Responses)
 		}
-		operation.Responses[status] = oas.ValueOrReferenceOf[oas.Response]{
-			Reference: &ref,
+		operation.Responses[status] = oas.Response{
+			ReferenceMixin: draft2020.ReferenceMixin[oas.Response]{
+				Ref: ref,
+			},
 		}
 	})
 }
@@ -168,37 +150,33 @@ func WithCallback(name string, method string, url oas.RuntimeExpression, opts ..
 	op := New("", opts...)
 	return optionFunc(func(operation *oas.Operation) {
 		if operation.Callbacks == nil {
-			operation.Callbacks = make(map[string]oas.ValueOrReferenceOf[oas.Callback])
+			operation.Callbacks = make(map[string]oas.Callback)
 		}
 		callback, ok := operation.Callbacks[name]
 		if !ok {
-			callback = oas.ValueOrReferenceOf[oas.Callback]{
-				Value: oas.Callback{},
-			}
+			callback = oas.Callback{}
 		}
 		itemOrRef, ok := callback.Value[url]
 		if !ok {
-			itemOrRef = oas.ValueOrReferenceOf[oas.PathItem]{
-				Value: oas.PathItem{},
-			}
+			itemOrRef = oas.PathItem{}
 		}
 		switch method {
 		case http.MethodGet:
-			itemOrRef.Value.Get = op
+			itemOrRef.Get = op
 		case http.MethodHead:
-			itemOrRef.Value.Head = op
+			itemOrRef.Head = op
 		case http.MethodPost:
-			itemOrRef.Value.Post = op
+			itemOrRef.Post = op
 		case http.MethodPut:
-			itemOrRef.Value.Put = op
+			itemOrRef.Put = op
 		case http.MethodPatch:
-			itemOrRef.Value.Patch = op
+			itemOrRef.Patch = op
 		case http.MethodDelete:
-			itemOrRef.Value.Delete = op
+			itemOrRef.Delete = op
 		case http.MethodOptions:
-			itemOrRef.Value.Options = op
+			itemOrRef.Options = op
 		case http.MethodTrace:
-			itemOrRef.Value.Trace = op
+			itemOrRef.Trace = op
 		default:
 			panic(fmt.Errorf("invalid http method: %s", method))
 		}
@@ -207,21 +185,21 @@ func WithCallback(name string, method string, url oas.RuntimeExpression, opts ..
 	})
 }
 
-//func WithCallbackPathItemReference(name string, url oas.RuntimeExpression, ref oas.Reference) Option {
+//func WithCallbackPathItemReference(name string, url oas.RuntimeExpression, ref string) Option {
 //	return optionFunc(func(operation *oas.Operation) {
 //		if operation.Callbacks == nil {
-//			operation.Callbacks = make(map[string]oas.ValueOrReferenceOf[oas.Callback])
+//			operation.Callbacks = make(map[string]oas.Callback)
 //		}
 //		callback, ok := operation.Callbacks[name]
 //		if !ok {
-//			callback = oas.ValueOrReferenceOf[oas.Callback]{
-//				Value: oas.Callback{},
-//			}
+//			callback = oas.Callback{}
 //		}
 //		itemOrRef, ok := callback.Value[url]
 //		if !ok {
-//			itemOrRef = oas.ValueOrReferenceOf[oas.PathItem]{
-//				Reference: ref,
+//			itemOrRef = oas.PathItem{
+//				ReferenceMixin: draft2020.ReferenceMixin[oas.PathItem]{
+//					Ref: ref,
+//				},
 //			}
 //		}
 //		callback.Value[url] = itemOrRef
@@ -229,15 +207,17 @@ func WithCallback(name string, method string, url oas.RuntimeExpression, opts ..
 //	})
 //}
 
-func WithCallbackReference(name string, ref oas.Reference) Option {
+func WithCallbackReference(name string, ref string) Option {
 	return optionFunc(func(operation *oas.Operation) {
 		if operation.Callbacks == nil {
-			operation.Callbacks = make(map[string]oas.ValueOrReferenceOf[oas.Callback])
+			operation.Callbacks = make(map[string]oas.Callback)
 		}
 		callback, ok := operation.Callbacks[name]
 		if !ok {
-			callback = oas.ValueOrReferenceOf[oas.Callback]{
-				Reference: &ref,
+			callback = oas.Callback{
+				ReferenceMixin: draft2020.ReferenceMixin[oas.Callback]{
+					Ref: ref,
+				},
 			}
 		}
 		operation.Callbacks[name] = callback

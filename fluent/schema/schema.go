@@ -6,6 +6,7 @@ import (
 
 	"github.com/MaiMee1/go-apispec/fluent/schema/encoder"
 	"github.com/MaiMee1/go-apispec/oas/jsonschema"
+	"github.com/MaiMee1/go-apispec/oas/jsonschema/draft2020"
 	"github.com/MaiMee1/go-apispec/oas/v3"
 )
 
@@ -28,19 +29,20 @@ func For[T any](opts ...Option) oas.Schema {
 	return New(typ, opts...)
 }
 
-func RefFor[T any](opts ...Option) oas.Reference {
+func RefFor[T any](opts ...Option) oas.Schema {
 	typ := reflect.TypeFor[T]()
 	schema := enc.Encode(typ)
 	for _, opt := range opts {
 		opt.apply(&schema)
 	}
 	if schema.Type.Has(jsonschema.ObjectType) {
-		ref := oas.Reference{
-			Ref: fmt.Sprintf("#/components/schemas/%s", schema.Extensions["Name"].(string)),
+		return oas.Schema{
+			ReferenceMixin: draft2020.ReferenceMixin[oas.Schema]{
+				Ref: fmt.Sprintf("#/components/schemas/%s", schema.Extensions["Name"].(string)),
+			},
 		}
-		return ref
 	}
-	panic(fmt.Errorf("%v should be convertable to an object", typ))
+	return schema
 }
 
 func Cached() map[string]*oas.Schema {

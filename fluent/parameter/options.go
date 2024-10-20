@@ -27,20 +27,18 @@ func WithExample(value interface{}) Option {
 func WithExamples(summary string, description oas.RichText, value interface{}) Option {
 	return optionFunc(func(parameter *oas.Parameter) {
 		if parameter.Examples == nil {
-			parameter.Examples = make(map[string]oas.ValueOrReferenceOf[oas.Example])
+			parameter.Examples = make(map[string]oas.Example)
 		}
 		k := next(parameter.Examples)
-		parameter.Examples[k] = oas.ValueOrReferenceOf[oas.Example]{
-			Value: oas.Example{
-				Summary:     summary,
-				Description: description,
-				Value:       value,
-			},
+		parameter.Examples[k] = oas.Example{
+			Summary:     summary,
+			Description: description,
+			Value:       value,
 		}
 	})
 }
 
-func next(examples map[string]oas.ValueOrReferenceOf[oas.Example]) string {
+func next(examples map[string]oas.Example) string {
 	const limit = 100
 	var k string
 	for i := 0; i < limit; i++ {
@@ -174,9 +172,9 @@ func WithSchema(schema oas.Schema) Option {
 	})
 }
 
-func WithSchemaReference(ref oas.Reference) Option {
+func WithSchemaReference(ref string) Option {
 	var s oas.Schema
-	s.Ref = ref.Ref
+	s.Ref = ref
 	return optionFunc(func(parameter *oas.Parameter) {
 		parameter.Schema = &s
 	})
@@ -194,14 +192,6 @@ func WithComplexSerialization(keyAndValues ...interface{}) Option {
 			case oas.Schema:
 				parameter.Content[key] = oas.MediaType{
 					Schema:   &v,
-					Example:  nil,
-					Examples: nil,
-				}
-			case oas.Reference:
-				var s oas.Schema
-				s.Ref = v.Ref
-				parameter.Content[key] = oas.MediaType{
-					Schema:   &s,
 					Example:  nil,
 					Examples: nil,
 				}
