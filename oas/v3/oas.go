@@ -191,12 +191,12 @@ func Default() OpenAPI {
 }
 
 type OpenAPI struct {
-	Version      SemanticVersion              `json:"openapi" validate:"required"`
-	Info         Info                         `json:"info" validate:"required"`
+	Version      SemanticVersion              `json:"openapi,omitempty" validate:"required"`
+	Info         Info                         `json:"info,omitempty" validate:"required"`
 	Servers      []Server                     `json:"servers,omitempty" validate:"dive"`
 	Paths        Paths                        `json:"paths,omitempty" validate:"dive"`
 	Webhooks     map[string]PathItem          `json:"webhooks,omitempty" validate:"dive"`
-	Components   Components                   `json:"components"`
+	Components   Components                   `json:"components,omitempty"`
 	Security     []SecurityRequirement        `json:"security,omitempty" validate:"dive"`
 	Tags         []Tag                        `json:"tags,omitempty" validate:"dive"`
 	ExternalDocs *oas31.ExternalDocumentation `json:"externalDocs,omitempty"`
@@ -209,12 +209,12 @@ func (doc *OpenAPI) Validate() error {
 
 // Info provides metadata about the API. The metadata MAY be used by the clients if needed, and MAY be presented in editing or documentation generation tools for convenience.
 type Info struct {
-	Title          string                 `json:"title" validate:"required"`
-	Description    RichText               `json:"description"`
+	Title          string                 `json:"title,omitempty" validate:"required"`
+	Description    RichText               `json:"description,omitempty"`
 	TermsOfService string                 `json:"termsOfService,omitempty" validate:"omitempty,url"`
 	Contact        *Contact               `json:"contact,omitempty"`
 	License        *License               `json:"license,omitempty"`
-	Version        string                 `json:"version" validate:"required"`
+	Version        string                 `json:"version,omitempty" validate:"required"`
 	Extensions     SpecificationExtension `json:"-"`
 }
 
@@ -226,27 +226,27 @@ type Contact struct {
 }
 
 type License struct {
-	Name       string                 `json:"name" validate:"required"`
+	Name       string                 `json:"name,omitempty" validate:"required"`
 	Url        string                 `json:"url,omitempty" validate:"url,omitempty"`
 	Extensions SpecificationExtension `json:"-"`
 }
 
 type Server struct {
-	Url         UrlTemplate               `json:"url" validate:"required"`
-	Description RichText                  `json:"description"`
+	Url         UrlTemplate               `json:"url,omitempty" validate:"required"`
+	Description RichText                  `json:"description,omitempty"`
 	Variables   map[string]ServerVariable `json:"variables,omitempty" validate:"dive"`
 	Extensions  SpecificationExtension    `json:"-"`
 }
 
 type ServerVariable struct {
 	Enum        []string               `json:"enum,omitempty" validate:"min=1"`
-	Default     string                 `json:"default" validate:"required"`
-	Description RichText               `json:"description"`
+	Default     string                 `json:"default,omitempty" validate:"required"`
+	Description RichText               `json:"description,omitempty"`
 	Extensions  SpecificationExtension `json:"-"`
 }
 
 type Components struct {
-	Schemas         map[string]oas31.Schema   `json:"schemas,omitempty" validate:"dive"`
+	Schemas         map[string]Schema         `json:"schemas,omitempty" validate:"dive"`
 	Responses       map[string]Response       `json:"responses,omitempty" validate:"dive"`
 	Parameters      map[string]Parameter      `json:"parameters,omitempty" validate:"dive"`
 	Examples        map[string]Example        `json:"examples,omitempty" validate:"dive"`
@@ -316,8 +316,8 @@ func (i *PathItem) Range() map[string]Operation {
 
 type Operation struct {
 	Tags         []string                     `json:"tags,omitempty"`
-	Summary      string                       `json:"summary"`
-	Description  RichText                     `json:"description"`
+	Summary      string                       `json:"summary,omitempty"`
+	Description  RichText                     `json:"description,omitempty"`
 	ExternalDocs *oas31.ExternalDocumentation `json:"externalDocs,omitempty"`
 	OperationId  string                       `json:"operationId,omitempty"`
 	Parameters   []Parameter                  `json:"parameters,omitempty" validate:"dive"`
@@ -332,16 +332,16 @@ type Operation struct {
 
 type Parameter struct {
 	draft2020.ReferenceMixin[Parameter]
-	Name            string                 `json:"name" validate:"required"`
-	In              Location               `json:"in" validate:"required"`
-	Description     RichText               `json:"description"`
-	Required        bool                   `json:"required" validate:"required_if=In 3"`
+	Name            string                 `json:"name,omitempty" validate:"required"`
+	In              Location               `json:"in,omitempty" validate:"required"`
+	Description     RichText               `json:"description,omitempty"`
+	Required        bool                   `json:"required,omitempty" validate:"required_if=In 3"`
 	Deprecated      bool                   `json:"deprecated,omitempty"`
 	AllowEmptyValue bool                   `json:"allowEmptyValue,omitempty"` // Deprecated
 	Style           Style                  `json:"style,omitempty"`
 	Explode         *bool                  `json:"explode,omitempty"`
 	AllowReserved   bool                   `json:"allowReserved,omitempty"`
-	Schema          *oas31.Schema          `json:"schema,omitempty" validate:"required_without=Content"`
+	Schema          Schema                 `json:"schema,omitempty" validate:"required_without=Content"`
 	Content         map[string]MediaType   `json:"content,omitempty" validate:"required_without=Schema"`
 	Example         interface{}            `json:"example,omitempty"`
 	Examples        map[string]Example     `json:"examples,omitempty"`
@@ -350,14 +350,14 @@ type Parameter struct {
 
 type RequestBody struct {
 	draft2020.ReferenceMixin[RequestBody]
-	Description RichText               `json:"description"`
-	Content     map[string]MediaType   `json:"content" validate:"required"`
-	Required    bool                   `json:"required"`
+	Description RichText               `json:"description,omitempty"`
+	Content     map[string]MediaType   `json:"content,omitempty" validate:"required"`
+	Required    bool                   `json:"required,omitempty"`
 	Extensions  SpecificationExtension `json:"-"`
 }
 
 type MediaType struct {
-	Schema     *oas31.Schema          `json:"schema,omitempty"`
+	Schema     Schema                 `json:"schema,omitempty"`
 	Example    interface{}            `json:"example,omitempty"`
 	Examples   map[string]Example     `json:"examples,omitempty"`
 	Encoding   map[string]Encoding    `json:"encoding,omitempty"`
@@ -365,7 +365,7 @@ type MediaType struct {
 }
 
 type Encoding struct {
-	ContentType   string                 `json:"contentType"`
+	ContentType   string                 `json:"contentType,omitempty"`
 	Headers       map[string]Header      `json:"headers,omitempty"`
 	Style         Style                  `json:"style,omitempty"`
 	Explode       *bool                  `json:"explode,omitempty"`
@@ -400,7 +400,7 @@ func isValidContentKey(key string) bool {
 
 type Response struct {
 	draft2020.ReferenceMixin[Response]
-	Description RichText               `json:"description" validate:"required"`
+	Description RichText               `json:"description,omitempty" validate:"required"`
 	Headers     map[string]Header      `json:"headers,omitempty"`
 	Content     map[string]MediaType   `json:"content,omitempty"`
 	Links       map[string]Link        `json:"links,omitempty"`
@@ -447,8 +447,8 @@ func isValidCallbackKey(key string) bool {
 
 type Example struct {
 	draft2020.ReferenceMixin[Example]
-	Summary       string                 `json:"summary"`
-	Description   RichText               `json:"description"`
+	Summary       string                 `json:"summary,omitempty"`
+	Description   RichText               `json:"description,omitempty"`
 	Value         interface{}            `json:"value,omitempty" validate:"excluded_with=ExternalValue"`
 	ExternalValue string                 `json:"externalValue,omitempty" validate:"excluded_with=Value"`
 	Extensions    SpecificationExtension `json:"-"`
@@ -467,9 +467,9 @@ type Link struct {
 
 type Header struct {
 	draft2020.ReferenceMixin[Header]
-	Description     RichText               `json:"description"`
-	Required        bool                   `json:"required" validate:"required_if=In path"`
-	Deprecated      bool                   `json:"deprecated"`
+	Description     RichText               `json:"description,omitempty"`
+	Required        bool                   `json:"required,omitempty" validate:"required_if=In path"`
+	Deprecated      bool                   `json:"deprecated,omitempty"`
 	AllowEmptyValue bool                   `json:"allowEmptyValue,omitempty"` // Deprecated
 	Style           Style                  `json:"style,omitempty"`
 	Explode         *bool                  `json:"explode,omitempty"`
@@ -482,14 +482,14 @@ type Header struct {
 }
 
 type Tag struct {
-	Name         string                       `json:"name" validate:"required"`
+	Name         string                       `json:"name,omitempty" validate:"required"`
 	Description  RichText                     `json:"description,omitempty"`
 	ExternalDocs *oas31.ExternalDocumentation `json:"externalDocs,omitempty"`
 	Extensions   SpecificationExtension       `json:"-"`
 }
 
 type SecurityScheme struct {
-	Type             Scheme                 `json:"type" validate:"required"`
+	Type             Scheme                 `json:"type,omitempty" validate:"required"`
 	Description      RichText               `json:"description,omitempty"`
 	Name             string                 `json:"name,omitempty"  validate:"required_if=Type 1,excluded_unless=Type 1"`
 	In               Location               `json:"in,omitempty"  validate:"required_if=Type 1,excluded_unless=Type 1,omitempty,oneof=1 2 4"`
