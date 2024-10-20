@@ -409,7 +409,7 @@ type Response struct {
 
 type Callback struct {
 	draft2020.ReferenceMixin[Callback]
-	callback map[RuntimeExpression]PathItem
+	Value map[RuntimeExpression]PathItem
 }
 
 //goland:noinspection GoMixedReceiverTypes
@@ -417,7 +417,7 @@ func (c Callback) MarshalJSON() ([]byte, error) {
 	if c.Ref != "" || c.DynamicRef != "" {
 		return json.Marshal(c.ReferenceMixin)
 	}
-	return json.Marshal(c.callback)
+	return json.Marshal(c.Value)
 }
 
 //goland:noinspection GoMixedReceiverTypes
@@ -427,15 +427,15 @@ func (c *Callback) UnmarshalJSON(b []byte) error {
 		return err
 	}
 
-	var callback map[RuntimeExpression]PathItem
-	if err := json.Unmarshal(b, &callback); err != nil {
+	var value map[RuntimeExpression]PathItem
+	if err := json.Unmarshal(b, &value); err != nil {
 		return err
 	}
-	delete(callback, "$ref")
-	delete(callback, "$dynamicRef")
+	delete(value, "$ref")
+	delete(value, "$dynamicRef")
 	*c = Callback{
 		ReferenceMixin: mixin,
-		callback:       callback,
+		Value:          value,
 	}
 	return nil
 }
