@@ -4,12 +4,13 @@ package ser
 import (
 	"encoding/json"
 	"fmt"
+	"reflect"
 )
 
 // Or allows two types to be serializable or deserialized to one value.
 //
 // Type A is tried first before type B for both serialization and deserialization.
-type Or[A, B comparable] struct {
+type Or[A, B any] struct {
 	X A
 	Y B
 }
@@ -39,7 +40,7 @@ func (o *Or[A, B]) UnmarshalJSON(b []byte) error {
 //goland:noinspection GoMixedReceiverTypes
 func (o Or[A, B]) MarshalJSON() ([]byte, error) {
 	var x A
-	if o.X != x {
+	if !reflect.DeepEqual(o.X, x) {
 		return json.Marshal(o.X)
 	}
 	return json.Marshal(o.Y)

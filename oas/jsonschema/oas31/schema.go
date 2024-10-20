@@ -12,16 +12,16 @@ import (
 var zero Schema
 
 type Schema struct {
-	draft2020.MetaSchemaMixin
+	draft2020.MetaSchemaMixin[*Schema]
 	draft2020.ReferenceMixin
 	draft2020.MetaDataMixin
 	draft2020.ValidationMixin
 	draft2020.StringMixin
 	draft2020.NumericMixin
-	draft2020.ObjectMixin
-	draft2020.ArrayMixin
-	draft2020.UnevaluatedMixin
-	draft2020.ApplicatorMixin
+	draft2020.ObjectMixin[*Schema]
+	draft2020.ArrayMixin[*Schema]
+	draft2020.UnevaluatedMixin[*Schema]
+	draft2020.ApplicatorMixin[*Schema]
 	OASMixin
 }
 

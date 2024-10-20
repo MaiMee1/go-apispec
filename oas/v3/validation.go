@@ -10,7 +10,7 @@ import (
 )
 
 func init() {
-	err := validate.Inst.RegisterValidation("url_fragment", func(fl validator.FieldLevel) bool {
+	err := validate.RegisterValidation("url_fragment", func(fl validator.FieldLevel) bool {
 		v := fl.Field()
 		if v.Kind() != reflect.String {
 			return true // skip

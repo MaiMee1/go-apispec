@@ -11,16 +11,16 @@ import (
 var zero Schema
 
 type Schema struct {
-	MetaSchemaMixin
+	MetaSchemaMixin[*Schema]
 	ReferenceMixin
 	MetaDataMixin
 	ValidationMixin
 	StringMixin
 	NumericMixin
-	ObjectMixin
-	ArrayMixin
-	UnevaluatedMixin
-	ApplicatorMixin
+	ObjectMixin[*Schema]
+	ArrayMixin[*Schema]
+	UnevaluatedMixin[*Schema]
+	ApplicatorMixin[*Schema]
 }
 
 func (m *Schema) Keywords() iter.Seq[jsonschema.Keyword] {

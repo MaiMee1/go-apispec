@@ -213,8 +213,8 @@ func (o ValueOrReferenceOf[T]) MarshalJSON() ([]byte, error) {
 }
 
 type DataType struct {
-	Type   Type   `json:"type" validate:"required"`
-	Format Format `json:"format,omitempty"`
+	Type   jsonschema.Type `json:"type" validate:"required"`
+	Format Format          `json:"format,omitempty"`
 }
 
 // UrlTemplate supports ServerVariable and MAY be relative, to indicate that the host location is relative to the location where the OpenAPI document is being served. Variable substitutions will be made when a variable is named in {brackets}.
@@ -224,7 +224,7 @@ type UrlTemplate string
 type RichText string
 
 // SpecificationExtension properties are implemented as patterned fields that are always prefixed by "x-".
-type SpecificationExtension map[string]interface{}
+type SpecificationExtension = oas31.SpecificationExtension
 
 // Default returns a minimal starting OpenAPI specs.
 func Default() OpenAPI {
@@ -250,7 +250,7 @@ type OpenAPI struct {
 }
 
 func (doc *OpenAPI) Validate() error {
-	return validate.Inst.Struct(doc)
+	return validate.Struct(doc)
 }
 
 // Info provides metadata about the API. The metadata MAY be used by the clients if needed, and MAY be presented in editing or documentation generation tools for convenience.

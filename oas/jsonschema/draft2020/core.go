@@ -9,25 +9,25 @@ import (
 	"github.com/MaiMee1/go-apispec/oas/jsonschema"
 )
 
-type MetaSchemaMixin struct {
-	Schema        string            `json:"$schema,omitempty" validate:"omitempty,uri"`
-	Id            string            `json:"$id,omitempty" validate:"omitempty,uri-reference"`
-	Comments      string            `json:"$comments,omitempty"`
-	Defs          map[string]Schema `json:"$defs,omitempty" validate:"dive"`
-	Anchor        string            `json:"$anchor,omitempty"`
-	DynamicAnchor string            `json:"$dynamicAnchor,omitempty"`
-	Vocabulary    map[string]bool   `json:"$vocabulary,omitempty" validate:"dive,keys,uri-reference,endkeys"`
+type MetaSchemaMixin[S jsonschema.Keyword] struct {
+	Schema        string          `json:"$schema,omitempty" validate:"omitempty,uri"`
+	Id            string          `json:"$id,omitempty" validate:"omitempty,uri-reference"`
+	Comments      string          `json:"$comments,omitempty"`
+	Defs          map[string]S    `json:"$defs,omitempty" validate:"dive"`
+	Anchor        string          `json:"$anchor,omitempty"`
+	DynamicAnchor string          `json:"$dynamicAnchor,omitempty"`
+	Vocabulary    map[string]bool `json:"$vocabulary,omitempty" validate:"dive,keys,uri-reference,endkeys"`
 }
 
-func (m *MetaSchemaMixin) Kind() jsonschema.Kind {
+func (m *MetaSchemaMixin[S]) Kind() jsonschema.Kind {
 	return jsonschema.Identifier | jsonschema.ReservedLocation
 }
 
-func (m *MetaSchemaMixin) AppliesTo(t jsonschema.Type) bool {
+func (m *MetaSchemaMixin[S]) AppliesTo(t jsonschema.Type) bool {
 	return true
 }
 
-func (m *MetaSchemaMixin) Validate(v interface{}) error {
+func (m *MetaSchemaMixin[S]) Validate(v interface{}) error {
 	_ = v.(*Schema)
 	return nil
 }

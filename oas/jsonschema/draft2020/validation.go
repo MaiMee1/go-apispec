@@ -3,38 +3,40 @@ package draft2020
 import (
 	"errors"
 	"fmt"
+	"maps"
+	"reflect"
+	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 
+	"github.com/MaiMee1/go-apispec/oas/internal/validate"
 	"github.com/MaiMee1/go-apispec/oas/jsonschema"
 	"github.com/MaiMee1/go-apispec/oas/ser"
-	"github.com/go-playground/validator/v10"
 )
 
 const validateTagSep = ','
 
-var validate = validator.New(validator.WithRequiredStructEnabled())
-
-type ArrayMixin struct {
-	MaxItems    int                     `json:"maxItems,omitempty" validate:"omitempty,gte=0"`
-	MinItems    int                     `json:"minItems,omitempty" validate:"omitempty,gte=0"`
-	UniqueItems bool                    `json:"uniqueItems,omitempty"`
-	PrefixItems []Schema                `json:"prefixItems,omitempty"`
-	Items       *ser.Or[*bool, *Schema] `json:"items,omitempty"`
-	Contains    *Schema                 `json:"contains,omitempty"`
-	MaxContains int                     `json:"maxContains,omitempty" validate:"omitempty,gte=0"`
-	MinContains *int                    `json:"minContains,omitempty" validate:"omitempty,gte=0"`
+type ArrayMixin[S jsonschema.Keyword] struct {
+	MaxItems    int              `json:"maxItems,omitempty" validate:"omitempty,gte=0"`
+	MinItems    int              `json:"minItems,omitempty" validate:"omitempty,gte=0"`
+	UniqueItems bool             `json:"uniqueItems,omitempty"`
+	PrefixItems []S              `json:"prefixItems,omitempty"`
+	Items       *ser.Or[bool, S] `json:"items,omitempty"`
+	Contains    S                `json:"contains,omitempty"`
+	MaxContains int              `json:"maxContains,omitempty" validate:"omitempty,gte=0"`
+	MinContains *int             `json:"minContains,omitempty" validate:"omitempty,gte=0"`
 }
 
-func (m *ArrayMixin) Kind() jsonschema.Kind {
+func (m *ArrayMixin[S]) Kind() jsonschema.Kind {
 	return jsonschema.Assertion
 }
 
-func (m *ArrayMixin) AppliesTo(t jsonschema.Type) bool {
+func (m *ArrayMixin[S]) AppliesTo(t jsonschema.Type) bool {
 	return t.Has(jsonschema.ArrayType)
 }
 
-func (m *ArrayMixin) Validate(v interface{}) error {
+func (m *ArrayMixin[S]) Validate(v interface{}) error {
 	arr := v.([]interface{})
 	if err := validate.Var(arr, m.validateTag()); err != nil {
 		return err
@@ -48,7 +50,7 @@ func (m *ArrayMixin) Validate(v interface{}) error {
 	return nil
 }
 
-func (m *ArrayMixin) validateTag() string {
+func (m *ArrayMixin[S]) validateTag() string {
 	b := strings.Builder{}
 	if m.MaxItems != 0 {
 		b.WriteString("max=")
@@ -67,36 +69,47 @@ func (m *ArrayMixin) validateTag() string {
 	return b.String()
 }
 
-func (m *ArrayMixin) checkItems(arr []interface{}) error {
-	for i, e := range arr {
-		var valid func(v interface{}) error
-		if len(m.PrefixItems) > i {
-			valid = m.PrefixItems[i].Validate
-		} else {
-			if m.Items != nil {
-				if m.Items.X != nil {
-					if *m.Items.X {
-						valid = func(v interface{}) error { return nil }
-					} else {
-						valid = func(v interface{}) error { return errors.New("items: false") }
-					}
-				} else {
-					valid = m.Items.Y.Validate
-				}
+func (m *ArrayMixin[S]) checkItems(arr []interface{}) error {
+	var additionalItemIsValid *bool
+	t := true
+	f := false
+	hasItems := m.Items != nil
+	if hasItems {
+		if reflect.DeepEqual(m.Items.Y, nil) {
+			if m.Items.X {
+				additionalItemIsValid = &t
 			} else {
-				valid = func(v interface{}) error { return nil }
+				additionalItemIsValid = &f
 			}
 		}
-		err := valid(e)
-		if err != nil {
-			return err
+	} else {
+		additionalItemIsValid = &t
+	}
+
+	for i, e := range arr {
+		if len(m.PrefixItems) > i {
+			if err := m.PrefixItems[i].Validate(e); err != nil {
+				return fmt.Errorf("prefixItems: invalid item at index %d: %w", i, err)
+			}
+		} else {
+			if additionalItemIsValid == nil {
+				if err := m.Items.Y.Validate(e); err != nil {
+					return fmt.Errorf("items: invalid item at index %d: %w", i, err)
+				}
+			} else {
+				if *additionalItemIsValid {
+					continue
+				} else {
+					return fmt.Errorf("items: items from index %d is invalid", i)
+				}
+			}
 		}
 	}
 	return nil
 }
 
-func (m *ArrayMixin) checkContains(arr []interface{}) error {
-	if m.Contains == nil {
+func (m *ArrayMixin[S]) checkContains(arr []interface{}) error {
+	if reflect.DeepEqual(m.Contains, nil) {
 		return nil
 	}
 	found := 0
@@ -166,26 +179,101 @@ func (m *NumericMixin) validateTag() string {
 	return b.String()
 }
 
-type ObjectMixin struct {
-	MaxProperties        int                    `json:"maxProperties,omitempty" validate:"omitempty,gte=0"`
-	MinProperties        int                    `json:"minProperties,omitempty" validate:"omitempty,gte=0"`
-	PropertyNames        *Schema                `json:"propertyNames,omitempty" validate:"omitempty,dive"`
-	Required             []string               `json:"required,omitempty" validate:"omitempty,min=1,unique"`
-	Properties           map[string]Schema      `json:"properties,omitempty" validate:"dive"`
-	PatternProperties    map[string]Schema      `json:"patternProperties,omitempty" validate:"dive,keys,regex,endkeys"`
-	AdditionalProperties *ser.Or[bool, *Schema] `json:"additionalProperties,omitempty"`
+type ObjectMixin[S jsonschema.Keyword] struct {
+	MaxProperties        int              `json:"maxProperties,omitempty" validate:"omitempty,gte=0"`
+	MinProperties        int              `json:"minProperties,omitempty" validate:"omitempty,gte=0"`
+	PropertyNames        S                `json:"propertyNames,omitempty" validate:"omitempty,dive"`
+	Required             []string         `json:"required,omitempty" validate:"omitempty,min=1,unique"`
+	Properties           map[string]S     `json:"properties,omitempty" validate:"dive"`
+	PatternProperties    map[string]S     `json:"patternProperties,omitempty" validate:"dive,keys,regex,endkeys"`
+	AdditionalProperties *ser.Or[bool, S] `json:"additionalProperties,omitempty"`
 }
 
-func (m *ObjectMixin) Kind() jsonschema.Kind {
+func (m *ObjectMixin[S]) Kind() jsonschema.Kind {
 	return jsonschema.Assertion
 }
 
-func (m *ObjectMixin) AppliesTo(t jsonschema.Type) bool {
+func (m *ObjectMixin[S]) AppliesTo(t jsonschema.Type) bool {
 	return t.Has(jsonschema.ObjectType)
 }
 
-func (m *ObjectMixin) Validate(v interface{}) error {
-	_ = v.(*Schema)
+func (m *ObjectMixin[S]) Validate(v interface{}) error {
+	obj := v.(map[string]interface{})
+	if err := validate.Var(obj, m.validateTag()); err != nil {
+		return err
+	}
+	if err := m.validateProperties(obj); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (m *ObjectMixin[S]) validateTag() string {
+	b := strings.Builder{}
+	if m.MaxProperties != 0 {
+		b.WriteString("max=")
+		b.WriteString(strconv.Itoa(m.MaxProperties))
+		b.WriteRune(validateTagSep)
+	}
+	if m.MinProperties != 0 {
+		b.WriteString("min=")
+		b.WriteString(strconv.Itoa(m.MinProperties))
+		b.WriteRune(validateTagSep)
+	}
+	return b.String()
+}
+
+func (m *ObjectMixin[S]) validateProperties(obj map[string]interface{}) error {
+	keys := slices.Collect(maps.Keys(obj))
+	for _, req := range m.Required {
+		if slices.Index(keys, req) == -1 {
+			return fmt.Errorf("required: property name %q not found", req)
+		}
+	}
+	hasPropertyNames := !reflect.DeepEqual(m.PropertyNames, nil)
+	hasProperties := !reflect.DeepEqual(m.Properties, nil)
+	hasPatternProperties := !reflect.DeepEqual(m.PatternProperties, nil)
+	hasAdditionalProperties := m.AdditionalProperties != nil
+	for k, v := range obj {
+		if hasPropertyNames {
+			if err := m.PropertyNames.Validate(v); err != nil {
+				return fmt.Errorf("propertyNames: property name %q: %w", k, err)
+			}
+		}
+		if hasProperties {
+			if s, ok := m.Properties[k]; ok {
+				if err := s.Validate(v); err != nil {
+					return fmt.Errorf("properties: property %q: %w", k, err)
+				}
+				continue
+			}
+		}
+		if hasPatternProperties {
+			for pattern, s := range m.PatternProperties {
+				if matched, err := regexp.Match(pattern, []byte(k)); matched || err != nil {
+					if err != nil {
+						return fmt.Errorf("patternProperties: pattern %q failed to compile %w", pattern, err)
+					}
+					if err := s.Validate(v); err != nil {
+						return fmt.Errorf("patternProperties: property %q: %w", k, err)
+					}
+					continue
+				}
+			}
+		}
+		if hasAdditionalProperties {
+			if !reflect.DeepEqual(m.AdditionalProperties.Y, nil) {
+				if err := m.AdditionalProperties.Y.Validate(v); err != nil {
+					return fmt.Errorf("additionalProperties: property %q: %w", k, err)
+				}
+				continue
+			}
+			if m.AdditionalProperties.X {
+				continue
+			}
+			return fmt.Errorf("additionalProperties: got extra property %q", k)
+		}
+	}
 	return nil
 }
 

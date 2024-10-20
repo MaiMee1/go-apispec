@@ -3,30 +3,31 @@ package draft2020
 import (
 	"errors"
 	"fmt"
+	"reflect"
 	"slices"
 
 	"github.com/MaiMee1/go-apispec/oas/jsonschema"
 )
 
-type ApplicatorMixin struct {
-	AllOf []Schema `json:"allOf,omitempty"`
-	AnyOf []Schema `json:"anyOf,omitempty"`
-	OneOf []Schema `json:"oneOf,omitempty"`
-	If    *Schema  `json:"if,omitempty"`
-	Then  *Schema  `json:"then,omitempty"`
-	Else  *Schema  `json:"else,omitempty"`
-	Not   *Schema  `json:"not,omitempty"`
+type ApplicatorMixin[S jsonschema.Keyword] struct {
+	AllOf []S `json:"allOf,omitempty"`
+	AnyOf []S `json:"anyOf,omitempty"`
+	OneOf []S `json:"oneOf,omitempty"`
+	If    S   `json:"if,omitempty"`
+	Then  S   `json:"then,omitempty"`
+	Else  S   `json:"else,omitempty"`
+	Not   S   `json:"not,omitempty"`
 }
 
-func (m *ApplicatorMixin) Kind() jsonschema.Kind {
+func (m *ApplicatorMixin[S]) Kind() jsonschema.Kind {
 	return jsonschema.Applicator
 }
 
-func (m *ApplicatorMixin) AppliesTo(t jsonschema.Type) bool {
+func (m *ApplicatorMixin[S]) AppliesTo(t jsonschema.Type) bool {
 	return true
 }
 
-func (m *ApplicatorMixin) Validate(v interface{}) error {
+func (m *ApplicatorMixin[S]) Validate(v interface{}) error {
 	if len(m.AllOf) > 0 {
 		for i, schema := range m.AllOf {
 			if err := schema.Validate(v); err != nil {
@@ -35,7 +36,7 @@ func (m *ApplicatorMixin) Validate(v interface{}) error {
 		}
 	}
 	if len(m.AnyOf) > 0 {
-		slices.ContainsFunc(m.AnyOf, func(schema Schema) bool {
+		slices.ContainsFunc(m.AnyOf, func(schema S) bool {
 			return schema.Validate(v) == nil
 		})
 	}
@@ -50,23 +51,23 @@ func (m *ApplicatorMixin) Validate(v interface{}) error {
 			return fmt.Errorf("oneOf: found %d matching at %v, want %d", len(indices), indices, 1)
 		}
 	}
-	if m.If != nil && (m.Then != nil || m.Else != nil) {
+	if !reflect.DeepEqual(m.If, nil) && (!reflect.DeepEqual(m.Then, nil) || !reflect.DeepEqual(m.Else, nil)) {
 		eval := m.If.Validate(v) == nil
 		if eval {
-			if m.Then != nil {
+			if !reflect.DeepEqual(m.Then, nil) {
 				if err := m.Then.Validate(v); err != nil {
 					return fmt.Errorf("then: %w", err)
 				}
 			}
 		} else {
-			if m.Else != nil {
+			if !reflect.DeepEqual(m.Else, nil) {
 				if err := m.Else.Validate(v); err != nil {
 					return fmt.Errorf("else: %w", err)
 				}
 			}
 		}
 	}
-	if m.Not != nil {
+	if !reflect.DeepEqual(m.Not, nil) {
 		if m.Not.Validate(v) == nil {
 			return errors.New("not: schema matched")
 		}

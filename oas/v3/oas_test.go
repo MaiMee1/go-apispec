@@ -32,7 +32,7 @@ func TestOpenAPI_UnmarshalJSON(t *testing.T) {
 	v := reflect.ValueOf(&document)
 	setRoot(v, root)
 
-	if err := validate.Inst.Struct(document); err != nil {
+	if err := validate.Struct(document); err != nil {
 		t.Error(err)
 	}
 
