@@ -162,13 +162,13 @@ func WithSimpleStyle(explode bool) Option {
 func WithSchemaFor[T any](opts ...schema.Option) Option {
 	s := schema.For[T](opts...)
 	return optionFunc(func(parameter *oas.Parameter) {
-		parameter.Schema = &s
+		parameter.Schema = s
 	})
 }
 
 func WithSchema(schema oas.Schema) Option {
 	return optionFunc(func(parameter *oas.Parameter) {
-		parameter.Schema = &schema
+		parameter.Schema = schema
 	})
 }
 
@@ -176,7 +176,7 @@ func WithSchemaReference(ref string) Option {
 	var s oas.Schema
 	s.Ref = ref
 	return optionFunc(func(parameter *oas.Parameter) {
-		parameter.Schema = &s
+		parameter.Schema = s
 	})
 }
 
@@ -191,7 +191,7 @@ func WithComplexSerialization(keyAndValues ...interface{}) Option {
 			switch v := value.(type) {
 			case oas.Schema:
 				parameter.Content[key] = oas.MediaType{
-					Schema:   &v,
+					Schema:   v,
 					Example:  nil,
 					Examples: nil,
 				}

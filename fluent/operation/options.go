@@ -71,7 +71,7 @@ func WithBody(description oas.RichText, required bool, keyAndValues ...interface
 		switch v := value.(type) {
 		case oas.Schema:
 			body.Content[key] = oas.MediaType{
-				Schema:   &v,
+				Schema:   v,
 				Example:  nil,
 				Examples: nil,
 			}
@@ -113,7 +113,7 @@ func WithResponse(code int, description oas.RichText, keyAndValues ...interface{
 		switch v := value.(type) {
 		case oas.Schema:
 			response.Content[key] = oas.MediaType{
-				Schema:   &v,
+				Schema:   v,
 				Example:  nil,
 				Examples: nil,
 			}
