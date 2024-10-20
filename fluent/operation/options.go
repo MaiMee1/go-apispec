@@ -78,7 +78,7 @@ func WithBody(description oas.RichText, required bool, keyAndValues ...interface
 		case oas.Reference:
 			body.Content[key] = oas.MediaType{
 				Schema: &oas.Schema{
-					ReferenceMixin: draft2020.ReferenceMixin{
+					ReferenceMixin: draft2020.ReferenceMixin[*oas.Schema]{
 						Ref: v.Ref,
 					},
 				},
@@ -130,7 +130,7 @@ func WithResponse(code int, description oas.RichText, keyAndValues ...interface{
 		case oas.Reference:
 			response.Content[key] = oas.MediaType{
 				Schema: &oas.Schema{
-					ReferenceMixin: draft2020.ReferenceMixin{
+					ReferenceMixin: draft2020.ReferenceMixin[*oas.Schema]{
 						Ref: v.Ref,
 					},
 				},
