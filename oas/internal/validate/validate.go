@@ -48,24 +48,6 @@ func VarWithValueCtx(ctx context.Context, field interface{}, other interface{}, 
 	return validate.VarWithValueCtx(ctx, field, other, tag)
 }
 
-func init() {
-	validate = validator.New()
-
-	if err := validate.RegisterValidation("uri-reference", func(fl validator.FieldLevel) bool {
-		fl.Field()
-		return true
-	}); err != nil {
-		panic(err)
-	}
-	if err := validate.RegisterValidation("regex", func(fl validator.FieldLevel) bool {
-		fl.Field()
-		// TODO: use subprocess to use node to validate regex
-		return true
-	}); err != nil {
-		panic(err)
-	}
-}
-
 type Validate interface {
 	SetTagName(name string)
 	ValidateMapCtx(ctx context.Context, data map[string]interface{}, rules map[string]interface{}) map[string]interface{}
