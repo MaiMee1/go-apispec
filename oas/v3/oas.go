@@ -246,7 +246,7 @@ type ServerVariable struct {
 }
 
 type Components struct {
-	Schemas         map[string]*oas31.Schema  `json:"schemas,omitempty" validate:"dive"`
+	Schemas         map[string]oas31.Schema   `json:"schemas,omitempty" validate:"dive"`
 	Responses       map[string]Response       `json:"responses,omitempty" validate:"dive"`
 	Parameters      map[string]Parameter      `json:"parameters,omitempty" validate:"dive"`
 	Examples        map[string]Example        `json:"examples,omitempty" validate:"dive"`

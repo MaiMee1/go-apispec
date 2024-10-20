@@ -13,7 +13,7 @@ var zero Schema
 
 type Schema struct {
 	draft2020.MetaSchemaMixin[*Schema]
-	draft2020.ReferenceMixin[*Schema]
+	draft2020.ReferenceMixin[Schema]
 	draft2020.MetaDataMixin
 	draft2020.ValidationMixin
 	draft2020.StringMixin
