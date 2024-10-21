@@ -261,7 +261,7 @@ func (enc *Encoder) objectSchema(t reflect.Type) (schema oas.Schema) {
 		schema.Required = slices.Collect(maps.Keys(required))
 		schema.Properties = properties
 	case reflect.Interface:
-		schema.Type = jsonschema.AnyType
+		schema.Type = 0
 	case reflect.Map:
 		item := enc.objectSchema(t.Elem())
 		schema.AdditionalProperties = &ser.Or[bool, *oas.Schema]{
